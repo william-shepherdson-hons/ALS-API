@@ -4,3 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+axum = "0.8.7"
+tokio = { version = "1.48.0", features = ["full"] }
+
+
+[[bin]]
+name = "kt"
+path = "./src/bin/main_kt.rs"
+
+[[bin]]
+name = "question"
+path = "./src/bin/main_question.rs"
