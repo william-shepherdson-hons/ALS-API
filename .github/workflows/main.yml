@@ -13,7 +13,7 @@ jobs:
     Pull:
         defaults:
             run:
-                working-directory: /home/dietpi/ALS-Algorithm/
+                working-directory: /home/dietpi/ALS-API/
         runs-on: self-hosted
         steps:
         - name: Pull
@@ -22,7 +22,7 @@ jobs:
         needs:  Pull
         defaults:
             run:
-                working-directory: /home/dietpi/ALS-Algorithm/
+                working-directory: /home/dietpi/ALS-API/
         runs-on: self-hosted
         steps:
         - name: Add cargo to PATH
@@ -34,7 +34,7 @@ jobs:
     Compile-Knowledge-Tracing-API:
         defaults:
             run:
-                working-directory: /home/dietpi/ALS-Algorithm/
+                working-directory: /home/dietpi/ALS-API/
         needs: Test-Knowledge-Tracing-API
         runs-on: self-hosted
         steps:
@@ -50,4 +50,4 @@ jobs:
           uses: actions/upload-artifact@v4
           with:
             name: Application
-            path: /home/dietpi/ALS-Algorithm/target/x86_64-pc-windows-msvc/release/bundle/nsis/elearningplatform_0.1.0_x64-setup.exe
+            path: /home/dietpi/ALS-API/target/x86_64-pc-windows-msvc/release/bundle/nsis/elearningplatform_0.1.0_x64-setup.exe
