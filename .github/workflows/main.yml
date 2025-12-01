@@ -48,12 +48,19 @@ jobs:
         needs: Compile-Knowledge-Tracing-API
         runs-on: self-hosted
         steps:
+        - name: Create temp folder for artifact
+          run: mkdir -p /home/dietpi/ALS-API/artifacts
+
+        - name: Copy binaries to temp folder
+          run: |
+            cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe /home/dietpi/ALS-API/artifacts/kt-windows.exe
+            cp /home/dietpi/ALS-API/target/release/kt /home/dietpi/ALS-API/artifacts/kt-linux
+
         - name: Upload Artifact
           uses: actions/upload-artifact@v4
           with:
             name: Application
-            path: |
-              /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe:kt-windows.exe
-              /home/dietpi/ALS-API/target/release/kt:kt-linux
+            path: /home/dietpi/ALS-API/artifacts/*
+
 
 
