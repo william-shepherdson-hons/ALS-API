@@ -61,7 +61,7 @@ jobs:
         defaults:
             run:
                 working-directory: /home/dietpi/ALS-API/
-        needs: Test-Knowledge-Tracing-API
+        needs: Test-Question-Generation-API
         runs-on: self-hosted
         steps:
         - name: Add cargo to PATH
