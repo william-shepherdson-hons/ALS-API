@@ -14,7 +14,7 @@ jobs:
         defaults:
             run:
                 working-directory: /home/dietpi/ALS-API/
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Pull
           run: git pull
@@ -23,7 +23,7 @@ jobs:
         defaults:
             run:
                 working-directory: /home/dietpi/ALS-API/
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Add cargo to PATH
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
@@ -36,7 +36,7 @@ jobs:
             run:
                 working-directory: /home/dietpi/ALS-API/
         needs: Test-Knowledge-Tracing-API
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Add cargo to PATH
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
@@ -49,7 +49,7 @@ jobs:
         defaults:
             run:
                 working-directory: /home/dietpi/ALS-API/
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Add cargo to PATH
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
@@ -62,7 +62,7 @@ jobs:
             run:
                 working-directory: /home/dietpi/ALS-API/
         needs: Test-Question-Generation-API
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Add cargo to PATH
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
@@ -72,7 +72,7 @@ jobs:
           run: cargo build --release --bin question
     Upload:
         needs: [Compile-Knowledge-Tracing-API, Compile-Question-Generation-API]
-        runs-on: self-hosted
+        runs-on: pi
         steps:
         - name: Create temp folder for artifact
           run: mkdir -p /home/dietpi/ALS-API/artifacts
