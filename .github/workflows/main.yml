@@ -91,14 +91,12 @@ jobs:
             path: /home/dietpi/ALS-API/artifacts/*
     Download-Artifact:
       needs: Upload-Artifact
-      defaults:
-        run: 
-          working-directory: /webserver
       runs-on: vps
       steps:
       - uses: actions/download-artifact@v5
         with:
           name: APIs
+          path: /webserver
 
 
 
