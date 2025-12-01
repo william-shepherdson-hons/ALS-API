@@ -52,7 +52,6 @@ jobs:
           uses: actions/upload-artifact@v4
           with:
             name: Application
-            path: |
-              /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe
-              /home/dietpi/ALS-API/target/release/kt
+            path: /home/dietpi/ALS-API/target/**/*/release/kt*
+
 
