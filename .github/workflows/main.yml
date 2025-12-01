@@ -42,8 +42,10 @@ jobs:
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
         - name: Compile for Windows
           run: cargo build --release --target x86_64-pc-windows-gnu --bin kt
-        - name: Compile for Linux
+        - name: Compile for Linux (ARM)
           run: cargo build --release --bin kt
+        - name: Compile for Linux (x86_64)
+          run: cargo build --release --target x86_64-unknown-linux-gnu --bin kt
     Test-Question-Generation-API:
         needs:  Pull
         defaults:
@@ -68,8 +70,10 @@ jobs:
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
         - name: Compile for Windows
           run: cargo build --release --target x86_64-pc-windows-gnu --bin question
-        - name: Compile for Linux
+        - name: Compile for Linux (ARM)
           run: cargo build --release --bin question
+        - name: Compile for Linux (x86_64)
+          run: cargo build --release --target x86_64-unknown-linux-gnu --bin question
     Upload-Artifact:
         needs: [Compile-Knowledge-Tracing-API, Compile-Question-Generation-API]
         runs-on: pi
@@ -80,9 +84,11 @@ jobs:
         - name: Copy binaries to temp folder
           run: |
             cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe /home/dietpi/ALS-API/artifacts/kt-windows.exe
-            cp /home/dietpi/ALS-API/target/release/kt /home/dietpi/ALS-API/artifacts/kt-linux
+            cp /home/dietpi/ALS-API/target/release/kt /home/dietpi/ALS-API/artifacts/kt-linux-arm
             cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/question.exe /home/dietpi/ALS-API/artifacts/question-windows.exe
-            cp /home/dietpi/ALS-API/target/release/question /home/dietpi/ALS-API/artifacts/question-linux
+            cp /home/dietpi/ALS-API/target/release/question /home/dietpi/ALS-API/artifacts/question-linux-arm
+            cp target/x86_64-unknown-linux-gnu/release/kt artifacts/kt-linux-x86_64
+            cp target/x86_64-unknown-linux-gnu/release/question artifacts/question-linux-x86_64
 
         - name: Upload Artifact
           uses: actions/upload-artifact@v4
