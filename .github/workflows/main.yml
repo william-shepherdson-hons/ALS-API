@@ -44,8 +44,34 @@ jobs:
           run: cargo build --release --target x86_64-pc-windows-gnu --bin kt
         - name: Compile for Linux
           run: cargo build --release --bin kt
+    Test-Question-Generation-API:
+        needs:  Pull
+        defaults:
+            run:
+                working-directory: /home/dietpi/ALS-API/
+        runs-on: self-hosted
+        steps:
+        - name: Add cargo to PATH
+          run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
+        - name: Build
+          run: cargo build --bin question --verbose
+        - name: Run tests
+          run: cargo test --bin question --verbose
+    Compile-Question-Generation-API:
+        defaults:
+            run:
+                working-directory: /home/dietpi/ALS-API/
+        needs: Test-Knowledge-Tracing-API
+        runs-on: self-hosted
+        steps:
+        - name: Add cargo to PATH
+          run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
+        - name: Compile for Windows
+          run: cargo build --release --target x86_64-pc-windows-gnu --bin question
+        - name: Compile for Linux
+          run: cargo build --release --bin question
     Upload:
-        needs: Compile-Knowledge-Tracing-API
+        needs: Compile-Knowledge-Tracing-API, Compile-Question-Generation-API
         runs-on: self-hosted
         steps:
         - name: Create temp folder for artifact
@@ -55,6 +81,8 @@ jobs:
           run: |
             cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe /home/dietpi/ALS-API/artifacts/kt-windows.exe
             cp /home/dietpi/ALS-API/target/release/kt /home/dietpi/ALS-API/artifacts/kt-linux
+            cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/question.exe /home/dietpi/ALS-API/artifacts/question-windows.exe
+            cp /home/dietpi/ALS-API/target/release/question /home/dietpi/ALS-API/artifacts/question-linux
 
         - name: Upload Artifact
           uses: actions/upload-artifact@v4
