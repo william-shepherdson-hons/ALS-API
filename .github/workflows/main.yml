@@ -103,6 +103,38 @@ jobs:
         with:
           name: APIs
           path: /webserver
+    Build-Knowledge-Tracing-Image:
+      needs: Download-Artifact
+      defaults:
+        run:
+            working-directory: /home/dietpi/ALS-API/
+      runs-on: vps
+      steps:
+      - name: Build Image
+        run: sudo docker build -f ./knowledge-api.dockerfile  -t knowledge-api .
+    Build-Question-Generation-Image:
+      needs: Download-Artifact
+      defaults:
+        run:
+            working-directory: /home/dietpi/ALS-API/
+      runs-on: vps
+      steps:
+      - name: Build Image
+        run: sudo docker build -f ./question-api.dockerfile  -t question-api .
+    Restart-Compose:
+      needs: [Build-Question-Generation-Image,Build-Knowledge-Tracing-Image]
+      defaults:
+        run:
+            working-directory: /home/dietpi/ALS-API/
+      runs-on: vps
+      steps:
+      - name: Compose down
+        run: sudo docker compose down
+      - name: Compose up
+        run: sudo docker compose up -d
+
+
+
 
 
 
