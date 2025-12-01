@@ -40,8 +40,10 @@ jobs:
         steps:
         - name: Add cargo to PATH
           run: echo "PATH=/home/dietpi/.cargo/bin:$PATH" >> $GITHUB_ENV
-        - name: Compile
+        - name: Compile for Windows
           run: cargo build --release --target x86_64-pc-windows-gnu --bin kt
+        - name: Compile for Linux
+          run: cargo build --release --bin kt
     Upload:
         needs: Compile-Knowledge-Tracing-API
         runs-on: self-hosted
@@ -50,4 +52,7 @@ jobs:
           uses: actions/upload-artifact@v4
           with:
             name: Application
-            path: /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/bundle/nsis/elearningplatform_0.1.0_x64-setup.exe
+            path: |
+              /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/kt.exe
+              /home/dietpi/ALS-API/target/release/kt
+
