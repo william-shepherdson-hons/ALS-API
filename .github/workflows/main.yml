@@ -71,7 +71,7 @@ jobs:
         - name: Compile for Linux
           run: cargo build --release --bin question
     Upload:
-        needs: Compile-Knowledge-Tracing-API, Compile-Question-Generation-API
+        needs: [Compile-Knowledge-Tracing-API, Compile-Question-Generation-API]
         runs-on: self-hosted
         steps:
         - name: Create temp folder for artifact
