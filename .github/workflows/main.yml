@@ -87,8 +87,8 @@ jobs:
             cp /home/dietpi/ALS-API/target/release/kt /home/dietpi/ALS-API/artifacts/kt-linux-arm
             cp /home/dietpi/ALS-API/target/x86_64-pc-windows-gnu/release/question.exe /home/dietpi/ALS-API/artifacts/question-windows.exe
             cp /home/dietpi/ALS-API/target/release/question /home/dietpi/ALS-API/artifacts/question-linux-arm
-            cp target/x86_64-unknown-linux-gnu/release/kt artifacts/kt-linux-x86_64
-            cp target/x86_64-unknown-linux-gnu/release/question artifacts/question-linux-x86_64
+            cp /home/dietpi/ALS-API/target/x86_64-unknown-linux-gnu/release/kt artifacts/kt-linux-x86_64
+            cp /home/dietpi/ALS-API/target/x86_64-unknown-linux-gnu/release/question artifacts/question-linux-x86_64
 
         - name: Upload Artifact
           uses: actions/upload-artifact@v4
