@@ -107,7 +107,7 @@ jobs:
       needs: Download-Artifact
       defaults:
         run:
-            working-directory: /home/dietpi/ALS-API/
+            working-directory: /webserver
       runs-on: vps
       steps:
       - name: Build Image
@@ -116,7 +116,7 @@ jobs:
       needs: Download-Artifact
       defaults:
         run:
-            working-directory: /home/dietpi/ALS-API/
+            working-directory: /webserver
       runs-on: vps
       steps:
       - name: Build Image
@@ -125,7 +125,7 @@ jobs:
       needs: [Build-Question-Generation-Image,Build-Knowledge-Tracing-Image]
       defaults:
         run:
-            working-directory: /home/dietpi/ALS-API/
+            working-directory: /webserver
       runs-on: vps
       steps:
       - name: Compose down
