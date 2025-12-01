@@ -70,7 +70,7 @@ jobs:
           run: cargo build --release --target x86_64-pc-windows-gnu --bin question
         - name: Compile for Linux
           run: cargo build --release --bin question
-    Upload:
+    Upload-Artifact:
         needs: [Compile-Knowledge-Tracing-API, Compile-Question-Generation-API]
         runs-on: pi
         steps:
@@ -87,8 +87,21 @@ jobs:
         - name: Upload Artifact
           uses: actions/upload-artifact@v4
           with:
-            name: Application
+            name: APIs
             path: /home/dietpi/ALS-API/artifacts/*
+    Download-Artifact:
+      needs: Upload-Artifact
+      defaults:
+        run: 
+          working-directory: /webserver
+      runs-on: vps
+      steps:
+      - uses: actions/download-artifact@v5
+        with:
+          name: APIs
+
+
+
 
 
 
