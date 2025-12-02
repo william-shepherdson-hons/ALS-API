@@ -6,5 +6,5 @@ pub async fn get_connection_string() -> Result<String, Box<dyn Error>> {
     let db = env::var("POSTGRES_DB")?;
     let pass = env::var("POSTGRES_PASSWORD")?;
     let ip = env::var("POSTGRES_IP")?;
-    Ok(format!("host={} user={} db={} password={}",ip,user,db,pass).to_string())
+    Ok(format!("host={} user={} dbname={} password={}",ip,user,db,pass).to_string())
 }
