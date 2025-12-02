@@ -1,9 +1,9 @@
 use axum::{
-    routing::get,
-    Router,
+    Json, Router, body, extract::Path, routing::{get,patch}
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use als_api::structs::performance_update::PerformanceUpdate;
 
 #[tokio::main]
 async fn main() {
@@ -29,5 +29,21 @@ async fn main() {
 )]
 async fn pong() -> &'static str {
     "pong"
+}
+
+#[utoipa::path(
+    patch,
+    path = "/students/{studentID}/skills/{skillID}/performance",
+    params(
+        ("studentID" = i32, Path, description = "ID of the student"),
+        ("skillID" = i32, Path, description = "ID of the skill")
+    ),
+    responses(
+        (status = 200, description = "Student Knowledge Update", body = f64),
+        (status = 400, description = "Bad request")
+    )
+)]
+async fn skill_update(Path((student_id, skill_id)) : Path<(i32,i32)>, Json(body) : Json<PerformanceUpdate>) -> f64 {
+    0.1
 }
 

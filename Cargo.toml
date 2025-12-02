@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+als-algorithm = { git = "https://github.com/william-shepherdson-hons/ALS-Algorithm.git", version = "0.1.0" }
 axum = "0.8.7"
 postgres = "0.19.12"
 serde = { version = "1.0.228", features = ["derive"] }
