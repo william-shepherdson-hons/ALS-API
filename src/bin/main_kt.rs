@@ -3,7 +3,7 @@ use axum::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use als_api::{services::question_service::get_knowledge_score, structs::{performance_update::PerformanceUpdate, knowledge_score_request::KnowledgeScoreRequest}};
+use als_api::{services::knowledge_service::{get_knowledge_score, update_knowledge_score}, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate}};
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
 
 #[tokio::main]
@@ -58,7 +58,17 @@ async fn skill_update(Path((student_id, skill_id)) : Path<(i32,i32)>, Json(body)
         }
     };
     let new_knowledge_score = calculate_mastery(existing_knowledge_score, 0.1, 0.1, 0.1, body.correct).await;
-    
+    let knowledge_update = KnowledgeScoreUpdate {
+        skill_id: skill_id,
+        student_id: student_id,
+        score: new_knowledge_score
+    };
+    let _ = match update_knowledge_score(knowledge_update).await {
+        Ok(_) => (),
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response();
+        }
+    };
 
 
     Json(new_knowledge_score).into_response()
