@@ -16,7 +16,7 @@ async fn main() {
 
     let app = Router::new()
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .route("/", get(pong));
+        .route("/ping", get(pong));
 
     // run on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
