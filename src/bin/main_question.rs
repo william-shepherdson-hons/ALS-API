@@ -1,10 +1,10 @@
+use als_api::services::generator::modules::fetch_module_list;
 use axum::{
-    routing::get,
-    Router,
-    Json
+    Json, Router, response::IntoResponse, routing::get
 };
 
 
+use reqwest::StatusCode;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -44,6 +44,12 @@ async fn pong() -> &'static str {
         (status = 200, description = "List of Modules", body = [String])
     )
 )]
-async fn get_modules() -> Json<Vec<String>> {
-    Json(vec!["test".to_string()])
+async fn get_modules() -> impl IntoResponse {
+    let modules = match fetch_module_list().await {
+        Ok(modules) => modules,
+        Err(e) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, format!("Failed to fetch module list: {}", e)).into_response();
+        }
+    };
+    Json(modules).into_response()
 }

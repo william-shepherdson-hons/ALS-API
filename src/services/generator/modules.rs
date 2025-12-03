@@ -1,5 +1,4 @@
 use crate::structs::module_list::ModuleList;
-use serde::Deserialize;
 
 #[derive(thiserror::Error, Debug)]
 pub enum GeneratorError {
@@ -10,7 +9,7 @@ pub enum GeneratorError {
 }
 
 
-async fn fetch_module_list() -> Result<Vec<String>, GeneratorError> {
+pub async fn fetch_module_list() -> Result<Vec<String>, GeneratorError> {
     let body = reqwest::get("http://172.18.0.12/modules")
         .await
         .map_err(|e| GeneratorError::Connection(format!("Failed to get a response from generator: {}", e)))?;
