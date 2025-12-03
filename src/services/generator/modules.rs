@@ -10,7 +10,7 @@ pub enum GeneratorError {
 
 
 pub async fn fetch_module_list() -> Result<Vec<String>, GeneratorError> {
-    let body = reqwest::get("http://172.18.0.12/modules")
+    let body = reqwest::get("http://172.18.0.12:5000/modules")
         .await
         .map_err(|e| GeneratorError::Connection(format!("Failed to get a response from generator: {}", e)))?;
     let module_list: ModuleList = body.json()
