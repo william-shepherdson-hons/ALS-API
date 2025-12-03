@@ -3,7 +3,7 @@ use axum::{
 };
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use als_api::{services::knowledge_service::{get_knowledge_score, update_knowledge_score}, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate}};
+use als_api::{services::database::knowledge_service::{get_knowledge_score, update_knowledge_score}, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate}};
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
 
 #[tokio::main]

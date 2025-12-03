@@ -1,5 +1,5 @@
 use tokio_postgres::NoTls;
-use crate::{services::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate}};
+use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum KnowledgeError {
