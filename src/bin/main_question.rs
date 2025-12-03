@@ -33,3 +33,14 @@ async fn main() {
 async fn pong() -> &'static str {
     "pong"
 }
+
+#[utoipa::path(
+    get,
+    path = "/modules",
+    responses(
+        (status = 200, description = "List of Modules")
+    )
+)]
+async fn get_modules() -> Vec<String> {
+    ["test".to_string()].to_vec()
+}
