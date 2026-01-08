@@ -16,7 +16,7 @@ async fn main() {
     let app = Router::new()
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/ping", get(pong))
-        .route("/generate/:module/:difficulty", get(generate))
+        .route("/generate/{module}/{difficulty}", get(generate))
         .route("/modules", get(get_modules));
     
     // run on port 3000
