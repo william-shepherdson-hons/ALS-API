@@ -1,5 +1,6 @@
 use std::fmt;
-#[derive(Debug, Clone, Copy)]
+use utoipa::ToSchema;
+#[derive(Debug, Clone, Copy, ToSchema)]
 pub enum Difficulty {
     Easy,
     Medium,
@@ -15,3 +16,6 @@ impl fmt::Display for Difficulty {
         write!(f, "{}", s)
     }
 }
+
+
+
