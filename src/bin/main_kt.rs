@@ -1,19 +1,15 @@
 use axum::{
     Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::{get, patch, post}
 };
+use base64::Engine;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     services::database::{
-        knowledge_service::{get_knowledge_score, update_knowledge_score},
-        account::{create_account, check_password}
+        account::{AccountError, check_password, create_account}, knowledge_service::{get_knowledge_score, update_knowledge_score}
     }, 
     structs::{
-        knowledge_score_request::KnowledgeScoreRequest, 
-        knowledge_score_update::KnowledgeScoreUpdate, 
-        performance_update::PerformanceUpdate,
-        account::Account,
-        sign_in::SignIn
+        account::Account, knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, sign_in::SignIn
     }
 };
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
@@ -114,15 +110,22 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
     path = "/accounts/login",
     request_body = SignIn,
     responses(
-        (status = 200, description = "Login successful", body = bool),
+        (status = 200, description = "Login successful", body = String), // Return the refresh token as base64
         (status = 401, description = "Unauthorized - Invalid credentials"),
         (status = 400, description = "Bad request")
     )
 )]
 async fn login(Json(credentials): Json<SignIn>) -> impl IntoResponse {
     match check_password(credentials).await {
-        Ok(true) => (StatusCode::OK, "Login successful").into_response(),
-        Ok(false) => (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response(),
+        Ok(token_bytes) => {
+            let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(token_bytes);
+            (StatusCode::OK, token).into_response()
+        },
+        Err(AccountError::Authentication(_)) => {
+            (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
+        },
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response()
+        }
     }
 }
