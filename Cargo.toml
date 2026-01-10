@@ -6,8 +6,10 @@ edition = "2024"
 [dependencies]
 als-algorithm = { git = "https://github.com/william-shepherdson-hons/ALS-Algorithm.git", version = "0.1.0" }
 anyhow = "1.0.100"
+argon2 = {version = "0.5.3"}
 axum = "0.8.7"
 postgres = "0.19.12"
+rand_core = { version = "0.6", features = ["getrandom"] }
 reqwest = {version = "0.12", default-features = false, features = ["rustls-tls","json"]}
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
