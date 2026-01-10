@@ -1,19 +1,18 @@
 use axum::{
     Json, Router, extract::Path, http::StatusCode, response::IntoResponse, routing::{get, patch, post}
 };
+use base64::Engine;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     services::database::{
-        knowledge_service::{get_knowledge_score, update_knowledge_score},
-        account::{create_account, check_password}
+        account::{AccountError, check_password, check_token, create_account}, 
+        knowledge_service::{get_knowledge_score, update_knowledge_score}
     }, 
     structs::{
-        knowledge_score_request::KnowledgeScoreRequest, 
-        knowledge_score_update::KnowledgeScoreUpdate, 
-        performance_update::PerformanceUpdate,
-        account::Account,
-        sign_in::SignIn
+        account::Account, knowledge_score_request::KnowledgeScoreRequest, 
+        knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, 
+        sign_in::SignIn, token_validation::TokenValidation
     }
 };
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
@@ -22,7 +21,7 @@ use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
 async fn main() {
     #[derive(OpenApi)]
     #[openapi(
-        paths(pong, skill_update, register_account, login), 
+        paths(pong, skill_update, register_account, login, validate_token), 
         components(schemas()), 
         tags()
     )]
@@ -33,7 +32,8 @@ async fn main() {
         .route("/ping", get(pong))
         .route("/students/{studentID}/skills/{skillID}/performance", patch(skill_update))
         .route("/accounts/register", post(register_account))
-        .route("/accounts/login", post(login));
+        .route("/accounts/login", post(login))
+        .route("/accounts/validate", post(validate_token));
     
     // run on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -114,15 +114,63 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
     path = "/accounts/login",
     request_body = SignIn,
     responses(
-        (status = 200, description = "Login successful", body = bool),
+        (status = 200, description = "Login successful", body = String),
         (status = 401, description = "Unauthorized - Invalid credentials"),
         (status = 400, description = "Bad request")
     )
 )]
 async fn login(Json(credentials): Json<SignIn>) -> impl IntoResponse {
     match check_password(credentials).await {
-        Ok(true) => (StatusCode::OK, "Login successful").into_response(),
-        Ok(false) => (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response(),
+        Ok(token_bytes) => {
+            let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(token_bytes);
+            (StatusCode::OK, token).into_response()
+        },
+        Err(AccountError::Authentication(_)) => {
+            (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
+        },
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response()
+        }
+    }
+}
+
+#[utoipa::path(
+    post,
+    path = "/accounts/validate",
+    request_body = TokenValidation,
+    responses(
+        (status = 200, description = "Token valid", body = String),
+        (status = 401, description = "Unauthorized - Invalid or expired token"),
+        (status = 400, description = "Bad request - Invalid token format")
+    )
+)]
+async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoResponse {
+    let token_bytes = match base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(&token_data.token) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            return (StatusCode::BAD_REQUEST, "Invalid token format").into_response();
+        }
+    };
+
+    let token_array: [u8; 32] = match token_bytes.try_into() {
+        Ok(arr) => arr,
+        Err(_) => {
+            return (StatusCode::BAD_REQUEST, "Invalid token length").into_response();
+        }
+    };
+
+    match check_token(token_array).await {
+        Ok(user_id) => {
+            (StatusCode::OK, Json(serde_json::json!({
+                "valid": true,
+                "user_id": user_id
+            }))).into_response()
+        },
+        Err(AccountError::Authentication(_)) => {
+            (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
+        },
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, format!("Validation failed: {e}")).into_response()
+        }
     }
 }
