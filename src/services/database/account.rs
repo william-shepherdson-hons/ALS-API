@@ -51,30 +51,35 @@ pub async fn create_account(new_account: Account) -> Result<(), AccountError> {
 pub async fn check_password(account_details: SignIn) -> Result<[u8; 32], AccountError> {
     let connection_string = get_connection_string().await
         .map_err(|e| AccountError::Database(format!("Failed to build connection string: {e}")))?;
-
     let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
         .await
         .map_err(|e| AccountError::Database(format!("Failed to connect to DB: {e}")))?;
-
-    // Spawn connection handler
+    
     tokio::spawn(async move {
         if let Err(e) = connection.await {
             eprintln!("Postgres connection error: {e}");
         }
     });
-    let row = client.query_one("SELECT password_hash FROM USERS WHERE username=$1 ", &[&account_details.username])
+    
+    let row = client.query_one(
+        "SELECT password_hash FROM users WHERE username=$1", 
+        &[&account_details.username]
+    )
         .await
-        .map_err(|e | AccountError::Database(format!("Failed to find user: {e}")))?;
+        .map_err(|e| AccountError::Database(format!("Failed to find user: {e}")))?;
+    
     let hash: String = row.get(0);
     let parsed_hash = PasswordHash::new(&hash)
         .map_err(|e| AccountError::Hashing(format!("Failed to parse stored hash: {e}")))?;
+    
     let argon2 = Argon2::default();
-
+    
+    argon2.verify_password(account_details.password.as_bytes(), &parsed_hash)
+        .map_err(|_| AccountError::Authentication("Invalid account details".to_string()))?;
+    
     let bytes = create_refresh_token(&account_details).await?;
-    match argon2.verify_password(account_details.password.as_bytes(), &parsed_hash) {
-        Ok(_) =>  Ok(bytes),
-        Err(_) => Err(AccountError::Authentication(format!("Invalid account details"))),
-    }
+    
+    Ok(bytes)
 }
 
 async fn create_refresh_token(account_details: &SignIn) -> Result<[u8; 32], AccountError> {
