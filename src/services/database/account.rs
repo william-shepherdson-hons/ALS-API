@@ -117,3 +117,41 @@ async fn create_refresh_token(account_details: &SignIn) -> Result<[u8; 32], Acco
     Ok(bytes)
 
 }
+
+pub async fn check_token(refresh_token: [u8; 32]) -> Result<String, AccountError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| AccountError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to connect to DB: {e}")))?;
+
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+
+
+    let rows = client.query("SELECT user_id, refresh_token_hash FROM SESSIONS", &[])
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to query sessions: {e}")))?;
+
+    let argon2 = Argon2::default();
+
+
+    for row in rows {
+        let user_id: String = row.get(0);
+        let hash: String = row.get(1);
+        
+        let parsed_hash = PasswordHash::new(&hash)
+            .map_err(|e| AccountError::Hashing(format!("Failed to parse stored hash: {e}")))?;
+
+        if argon2.verify_password(&refresh_token, &parsed_hash).is_ok() {
+            return Ok(user_id);
+        }
+    }
+
+    Err(AccountError::Authentication("Invalid or expired refresh token".to_string()))
+}
