@@ -5,10 +5,9 @@ use base64::Engine;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
-    services::database::{
+    middleware::auth::AuthenticatedUser, services::database::{
         account::{AccountError, check_password, check_token, create_account}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, update_knowledge_score}
-    }, 
-    structs::{
+    }, structs::{
         account::Account, knowledge_score_request::KnowledgeScoreRequest, 
         knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, 
         sign_in::SignIn, token_validation::TokenValidation
@@ -18,13 +17,34 @@ use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
 
 #[tokio::main]
 async fn main() {
+    use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+    
     #[derive(OpenApi)]
     #[openapi(
         paths(pong, skill_update, register_account, login, validate_token), 
-        components(schemas()), 
+        components(schemas()),
+        modifiers(&SecurityAddon),
         tags()
     )]
     struct ApiDoc;
+    
+    struct SecurityAddon;
+
+    impl utoipa::Modify for SecurityAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            if let Some(components) = openapi.components.as_mut() {
+                components.add_security_scheme(
+                    "bearer_auth",
+                    SecurityScheme::Http(
+                        HttpBuilder::new()
+                            .scheme(HttpAuthScheme::Bearer)
+                            .bearer_format("JWT")
+                            .build()
+                    ),
+                )
+            }
+        }
+    }
     
     let app = Router::new()
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
@@ -34,7 +54,6 @@ async fn main() {
         .route("/accounts/login", post(login))
         .route("/accounts/validate", post(validate_token));
     
-    // run on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
@@ -64,6 +83,7 @@ async fn pong() -> &'static str {
     )
 )]
 async fn skill_update(
+    _auth: AuthenticatedUser,
     Path((student_id, skill_id)): Path<(i32, i32)>, 
     Json(body): Json<PerformanceUpdate>
 ) -> impl IntoResponse {

@@ -21,6 +21,8 @@ tokio-postgres = "0.7.15"
 utoipa = "5.4.0"
 utoipa-swagger-ui = { version = "9.0.2", features = ["axum"] }
 chrono = { version = "0.4", features = ["serde"] }
+axum-extra = { version = "0.12", features = ["typed-header"] }
+async-trait = "0.1"
 
 
 [[bin]]
