@@ -24,7 +24,9 @@ pub fn issue_access_token(user_id: i32,secret: &str) -> Result<String, AccountEr
 }
 
 pub fn validate_jwt(token: &str, secret: &str) -> Result<Claims, AccountError> {
-    let validation = Validation::default();
+    let mut validation = Validation::default();
+    validation.set_audience(&["adapt math desktop-app"]);
+    validation.set_issuer(&["knowledge tracing api"]);
     decode::<Claims>(
         token,
         &DecodingKey::from_secret(secret.as_bytes()),
