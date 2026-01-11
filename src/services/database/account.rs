@@ -16,6 +16,10 @@ pub enum AccountError {
     Hashing(String),
     #[error("Authentication error: {0}")]
     Authentication(String),
+    #[error("Token creation error: {0}")]
+    TokenCreation(String),
+    #[error("Invalid token error: {0}")]
+    InvalidToken(String),
     #[error("Unexpected error: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -77,11 +81,11 @@ pub async fn check_password(account_details: SignIn) -> Result<[u8; 32], Account
     
     let argon2 = Argon2::default();
     
-    // Verify password FIRST before creating token
+
     argon2.verify_password(account_details.password.as_bytes(), &parsed_hash)
         .map_err(|_| AccountError::Authentication("Invalid account details".to_string()))?;
     
-    // Only create token after successful authentication
+
     let bytes = create_refresh_token(&account_details).await?;
     
     Ok(bytes)
@@ -112,7 +116,7 @@ async fn create_refresh_token(account_details: &SignIn) -> Result<[u8; 32], Acco
         }
     });
 
-    // FIX: user_id is i32, not String
+
     let row = client.query_one(
         "SELECT user_id FROM users WHERE username=$1", 
         &[&account_details.username]
@@ -120,7 +124,7 @@ async fn create_refresh_token(account_details: &SignIn) -> Result<[u8; 32], Acco
         .await
         .map_err(|e | AccountError::Database(format!("Failed to find user: {e}")))?;
     
-    let user_id: i32 = row.get(0);  // Changed from String to i32
+    let user_id: i32 = row.get(0); 
 
     client.execute(
         "INSERT INTO sessions (user_id, refresh_token_hash) VALUES($1, $2)", 
@@ -153,14 +157,14 @@ pub async fn check_token(refresh_token: [u8; 32]) -> Result<String, AccountError
     let argon2 = Argon2::default();
 
     for row in rows {
-        let user_id: i32 = row.get(0);  // Changed from String to i32
+        let user_id: i32 = row.get(0);  
         let hash: String = row.get(1);
         
         let parsed_hash = PasswordHash::new(&hash)
             .map_err(|e| AccountError::Hashing(format!("Failed to parse stored hash: {e}")))?;
 
         if argon2.verify_password(&refresh_token, &parsed_hash).is_ok() {
-            return Ok(user_id.to_string());  // Convert to String for return
+            return Ok(user_id.to_string());  
         }
     }
 
