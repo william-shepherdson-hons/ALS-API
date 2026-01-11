@@ -6,3 +6,4 @@ pub mod question_pair;
 pub mod account;
 pub mod sign_in;
 pub mod token_validation;
+pub mod claims;
