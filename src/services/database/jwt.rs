@@ -2,12 +2,12 @@ use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode}
 use crate::{services::database::account::AccountError, structs::claims::Claims};
 use chrono::Utc;
 
-pub fn issue_access_token(username: &str,user_id: i32,secret: &str) -> Result<String, AccountError> {
+pub fn issue_access_token(user_id: i32,secret: &str) -> Result<String, AccountError> {
     let now = Utc::now().timestamp() as usize;
     let exp = now + (15 * 60);
 
     let claims = Claims {
-        sub: username.to_owned(),
+        sub: user_id.to_string(),
         uid: user_id,
         iat: now,
         exp,

@@ -6,8 +6,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     services::database::{
-        account::{AccountError, check_password, check_token, create_account}, 
-        knowledge_service::{get_knowledge_score, update_knowledge_score}
+        account::{AccountError, check_password, check_token, create_account}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, update_knowledge_score}
     }, 
     structs::{
         account::Account, knowledge_score_request::KnowledgeScoreRequest, 
@@ -159,11 +158,25 @@ async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoRes
         }
     };
 
+
     match check_token(token_array).await {
         Ok(user_id) => {
+            let jwt_secret = match std::env::var("JWT_SECRET") {
+                Ok(secret) => secret,
+                Err(_) => {
+                    return (StatusCode::SERVICE_UNAVAILABLE, "JWT Token not set").into_response();
+                }
+            };
+            let token = match issue_access_token(user_id.parse::<i32>().unwrap(), &jwt_secret) {
+                Ok(token) => token,
+                Err(_) => {
+                    return (StatusCode::BAD_REQUEST, "Failed to issue token").into_response();
+                }
+            };
             (StatusCode::OK, Json(serde_json::json!({
                 "valid": true,
-                "user_id": user_id
+                "user_id": user_id,
+                "jwt_token": token
             }))).into_response()
         },
         Err(AccountError::Authentication(_)) => {
@@ -174,3 +187,4 @@ async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoRes
         }
     }
 }
+
