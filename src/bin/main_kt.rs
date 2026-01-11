@@ -80,6 +80,9 @@ async fn pong() -> &'static str {
     responses(
         (status = 200, description = "Student Knowledge Update", body = f64),
         (status = 400, description = "Bad request")
+    ),
+    security(
+        ("bearer_auth" = [])
     )
 )]
 async fn skill_update(
