@@ -20,7 +20,7 @@ impl<S> FromRequestParts<S> for AuthenticatedUser
 where
     S: Send + Sync,
 {
-    type Rejection = (StatusCode, &'static str);
+    type Rejection = (StatusCode, String);
 
     async fn from_request_parts(
         parts: &mut Parts,
@@ -29,13 +29,13 @@ where
         let TypedHeader(Authorization(bearer)) = parts
             .extract::<TypedHeader<Authorization<Bearer>>>()
             .await
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "Missing authorization header"))?;
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "Missing authorization header".to_string()))?;
 
         let jwt_secret = std::env::var("JWT_SECRET")
-            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "JWT secret not configured"))?;
+            .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "JWT secret not configured".to_string()))?;
 
         let claims = validate_jwt(bearer.token(), &jwt_secret)
-            .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid or expired token"))?;
+            .map_err(|e| (StatusCode::UNAUTHORIZED, format!("Invalid or expired token {e}")))?;
 
         Ok(Self { claims })
     }
