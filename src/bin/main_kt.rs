@@ -232,5 +232,5 @@ async fn fetch_user_details(auth: AuthenticatedUser) -> impl IntoResponse {
         Err(e) => {
             (StatusCode::BAD_REQUEST, format!("Failed to get account: {e}")).into_response()
         }
-    };
+    }
 }
