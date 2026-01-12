@@ -1,4 +1,4 @@
-use crate::{services::database::database::get_connection_string, structs::{account::Account, sign_in::SignIn}};
+use crate::{services::database::database::get_connection_string, structs::{account::Account, claims::Claims, sign_in::SignIn}};
 use tokio_postgres::NoTls;
 use argon2::{
     password_hash::{
@@ -169,4 +169,25 @@ pub async fn check_token(refresh_token: [u8; 32]) -> Result<String, AccountError
     }
 
     Err(AccountError::Authentication("Invalid or expired refresh token".to_string()))
+}
+
+pub async fn fetch_details(claims: &Claims) -> Result<Account, AccountError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| AccountError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+    let row = client.query_one("SELECT first_name, last_name FROM USERS WHERE user_id=$1", &[&claims.aud])
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to find user: {e}")))?;
+    let first_name: String = row.get(0);
+    let last_name: String = row.get(1);
+    Ok(Account { first_name: first_name, last_name: last_name, username: "none".to_string(), password: "none".to_string() })
 }

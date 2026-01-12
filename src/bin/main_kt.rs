@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     middleware::auth::AuthenticatedUser, services::database::{
-        account::{AccountError, check_password, check_token, create_account}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, update_knowledge_score}
+        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, update_knowledge_score}
     }, structs::{
         account::Account, knowledge_score_request::KnowledgeScoreRequest, 
         knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, 
@@ -52,7 +52,8 @@ async fn main() {
         .route("/students/{studentID}/skills/{skillID}/performance", patch(skill_update))
         .route("/accounts/register", post(register_account))
         .route("/accounts/login", post(login))
-        .route("/accounts/validate", post(validate_token));
+        .route("/accounts/validate", post(validate_token))
+        .route("/accounts/fetch", get(fetch_user_details));
     
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -211,3 +212,25 @@ async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoRes
     }
 }
 
+#[utoipa::path(
+    get,
+    path = "/accounts/fetch",
+    responses(
+        (status = 200, description = "Account", body = Account),
+        (status = 400, description = "Bad request")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+async fn fetch_user_details(auth: AuthenticatedUser) -> impl IntoResponse {
+    match fetch_details(&auth.claims).await {
+        Ok(account) => (StatusCode::OK, Json(serde_json::json!({
+            "first_name" : account.first_name,
+            "last_name" : account.last_name
+        }))).into_response(),
+        Err(e) => {
+            (StatusCode::BAD_REQUEST, format!("Failed to get account: {e}")).into_response()
+        }
+    };
+}
