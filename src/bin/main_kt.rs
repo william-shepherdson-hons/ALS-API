@@ -21,7 +21,7 @@ async fn main() {
     
     #[derive(OpenApi)]
     #[openapi(
-        paths(pong, skill_update, register_account, login, validate_token), 
+        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details), 
         components(schemas()),
         modifiers(&SecurityAddon),
         tags()
