@@ -49,7 +49,7 @@ async fn main() {
     let app = Router::new()
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/ping", get(pong))
-        .route("/students/{studentID}/skills/{skillID}/performance", patch(skill_update))
+        .route("/students/skills/{skillID}/performance", patch(skill_update))
         .route("/accounts/register", post(register_account))
         .route("/accounts/login", post(login))
         .route("/accounts/validate", post(validate_token))
@@ -72,7 +72,7 @@ async fn pong() -> &'static str {
 
 #[utoipa::path(
     patch,
-    path = "/students/{studentID}/skills/{skillID}/performance",
+    path = "/students/skills/{skillID}/performance",
     request_body = PerformanceUpdate,
     params(
         ("studentID" = i32, Path, description = "ID of the student"),
@@ -87,10 +87,11 @@ async fn pong() -> &'static str {
     )
 )]
 async fn skill_update(
-    _auth: AuthenticatedUser,
-    Path((student_id, skill_id)): Path<(i32, i32)>, 
+    auth: AuthenticatedUser,
+    Path(skill_id): Path<i32>, 
     Json(body): Json<PerformanceUpdate>
 ) -> impl IntoResponse {
+    let student_id = auth.claims.uid;
     let fetch_skill = KnowledgeScoreRequest {
         skill_id: skill_id,
         student_id: student_id

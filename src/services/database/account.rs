@@ -51,6 +51,13 @@ pub async fn create_account(new_account: Account) -> Result<(), AccountError> {
     )
         .await
         .map_err(|e| AccountError::Database(format!("Failed to insert new user: {e}")))?;
+    let user_id: i32 = client.query_one("SELECT user_id FROM USERS WHERE username=$1", &[&new_account.username])
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to fetch user id: {e}")))?
+        .get(0);
+    client.execute("SELECT $1 AS user_id, s.skill_id, 0.1 AS progression FROM skills s ON CONFLICT (user_id, skill_id) DO NOTHING;", &[&user_id])
+        .await
+        .map_err(|e| AccountError::Database(format!("Failed to add skills to database: {e}")))?;
 
     Ok(())
 }
