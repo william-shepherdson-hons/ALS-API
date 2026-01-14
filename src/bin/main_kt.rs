@@ -75,7 +75,6 @@ async fn pong() -> &'static str {
     path = "/students/skills/{skillID}/performance",
     request_body = PerformanceUpdate,
     params(
-        ("studentID" = i32, Path, description = "ID of the student"),
         ("skillID" = i32, Path, description = "ID of the skill")
     ),
     responses(

@@ -55,7 +55,7 @@ pub async fn create_account(new_account: Account) -> Result<(), AccountError> {
         .await
         .map_err(|e| AccountError::Database(format!("Failed to fetch user id: {e}")))?
         .get(0);
-    client.execute("SELECT $1 AS user_id, s.skill_id, 0.1 AS progression FROM skills s ON CONFLICT (user_id, skill_id) DO NOTHING;", &[&user_id])
+    client.execute("INSERT INTO progression (user_id, skill_id, progression) SELECT $1 AS user_id, s.skill_id, 0.1 AS progression FROM skills s ON CONFLICT (user_id, skill_id) DO NOTHING;", &[&user_id])
         .await
         .map_err(|e| AccountError::Database(format!("Failed to add skills to database: {e}")))?;
 
