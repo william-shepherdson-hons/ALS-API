@@ -20,11 +20,22 @@ pub enum AccountError {
     TokenCreation(String),
     #[error("Invalid token error: {0}")]
     InvalidToken(String),
+    #[error("Validation error: {0}")]
+    Validation(String),
     #[error("Unexpected error: {0}")]
     Other(#[from] anyhow::Error),
 }
 
 pub async fn create_account(new_account: Account) -> Result<(), AccountError> {
+    if new_account.first_name.trim().is_empty()
+        || new_account.last_name.trim().is_empty()
+        || new_account.username.trim().is_empty()
+        || new_account.password.trim().is_empty()
+    {
+        return Err(AccountError::Validation(
+            "All account fields must be provided and non-empty".to_string(),
+        ));
+    }
     let connection_string = get_connection_string().await
         .map_err(|e| AccountError::Database(format!("Failed to build connection string: {e}")))?;
 
