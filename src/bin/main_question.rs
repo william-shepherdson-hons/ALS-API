@@ -1,4 +1,4 @@
-use als_api::{enums::difficulty::Difficulty, middleware::auth::AuthenticatedUser, services::generator::modules::{fetch_module_list, generate_question}, structs::question_pair::QuestionPair};
+use als_api::{enums::difficulty::Difficulty, middleware::auth::AuthenticatedUser, services::{database::question_service::get_module_names, generator::modules::{fetch_module_list, generate_question}}, structs::question_pair::QuestionPair};
 use axum::{
     Json, Router, response::IntoResponse, routing::get
 };
@@ -83,7 +83,7 @@ async fn get_internal_modules(_auth: AuthenticatedUser) -> impl IntoResponse {
     )
 )]
 async fn get_modules(_auth: AuthenticatedUser) -> impl IntoResponse {
-    let modules = match fetch_module_list().await {
+    let modules = match get_module_names().await {
         Ok(modules) => modules,
         Err(e) => {
             return (StatusCode::SERVICE_UNAVAILABLE, format!("Failed to fetch module list: {}", e)).into_response();
