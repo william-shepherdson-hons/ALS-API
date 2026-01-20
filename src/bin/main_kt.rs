@@ -142,7 +142,7 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
 }
 
 #[utoipa::path(
-    patch,
+    get,
     path = "/students/skills/",
     responses(
         (status = 200, description = "Json  of skill progression", body = Vec<SkillProgression>),
