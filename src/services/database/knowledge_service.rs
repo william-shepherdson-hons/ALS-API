@@ -55,3 +55,23 @@ pub async fn update_knowledge_score(update: KnowledgeScoreUpdate) -> Result<(), 
 
     Ok(())
 }
+
+pub async fn get_skill_id(skill_name: &str) -> Result<i32, KnowledgeError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+    let row = client.query_one("SELECT skill_id FROM SKILLS WHERE skill_name=$1", &[&skill_name])
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to fetch skill id: {e}")))?;
+
+    Ok(row.get(0))
+}

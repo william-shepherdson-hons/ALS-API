@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     middleware::auth::AuthenticatedUser, services::database::{
-        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, update_knowledge_score}
+        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, get_skill_id, update_knowledge_score}
     }, structs::{
         account::Account, knowledge_score_request::KnowledgeScoreRequest, 
         knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, 
@@ -72,10 +72,10 @@ async fn pong() -> &'static str {
 
 #[utoipa::path(
     patch,
-    path = "/students/skills/{skillID}/performance",
+    path = "/students/skills/{skill}/performance",
     request_body = PerformanceUpdate,
     params(
-        ("skillID" = i32, Path, description = "ID of the skill")
+        ("skill" = String, Path, description = "ID of the skill")
     ),
     responses(
         (status = 200, description = "Student Knowledge Update", body = f64),
@@ -87,10 +87,20 @@ async fn pong() -> &'static str {
 )]
 async fn skill_update(
     auth: AuthenticatedUser,
-    Path(skill_id): Path<i32>, 
+    Path(skill): Path<String>, 
     Json(body): Json<PerformanceUpdate>
 ) -> impl IntoResponse {
     let student_id = auth.claims.uid;
+    let skill_id = match get_skill_id(&skill).await {
+        Ok(skill_id) => skill_id,
+        Err(e) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                format!("Failed to get skill id: {e}")
+            ).into_response();
+        }
+    };
+
     let fetch_skill = KnowledgeScoreRequest {
         skill_id: skill_id,
         student_id: student_id
