@@ -7,3 +7,4 @@ pub mod account;
 pub mod sign_in;
 pub mod token_validation;
 pub mod claims;
+pub mod skill_progression;

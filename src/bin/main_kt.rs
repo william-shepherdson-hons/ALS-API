@@ -6,11 +6,9 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     middleware::auth::AuthenticatedUser, services::database::{
-        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_knowledge_score, get_skill_id, update_knowledge_score}
+        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_all_progression_score, get_knowledge_score, get_skill_id, update_knowledge_score}
     }, structs::{
-        account::Account, knowledge_score_request::KnowledgeScoreRequest, 
-        knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, 
-        sign_in::SignIn, token_validation::TokenValidation
+        account::Account, knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, sign_in::SignIn, skill_progression::SkillProgression, token_validation::TokenValidation
     }
 };
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
@@ -21,7 +19,7 @@ async fn main() {
     
     #[derive(OpenApi)]
     #[openapi(
-        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details), 
+        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details, get_progression), 
         components(schemas()),
         modifiers(&SecurityAddon),
         tags()
@@ -53,7 +51,8 @@ async fn main() {
         .route("/accounts/register", post(register_account))
         .route("/accounts/login", post(login))
         .route("/accounts/validate", post(validate_token))
-        .route("/accounts/fetch", get(fetch_user_details));
+        .route("/accounts/fetch", get(fetch_user_details))
+        .route("/students/skills/", get(get_progression));
     
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     axum::serve(listener, app).await.unwrap();
@@ -140,6 +139,29 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
         Ok(_) => (StatusCode::CREATED, "Account created successfully").into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to create account: {e}")).into_response(),
     }
+}
+
+#[utoipa::path(
+    patch,
+    path = "/students/skills/",
+    responses(
+        (status = 200, description = "Json  of skill progression", body = Vec<SkillProgression>),
+        (status = 400, description = "Bad request")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+
+async fn get_progression(auth: AuthenticatedUser) -> impl  IntoResponse {
+    let user_id = auth.claims.uid;
+    let progression = match get_all_progression_score(user_id).await {
+        Ok(progression) => progression,
+        Err(e) => {
+            return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response();
+        }
+    };
+    Json(progression).into_response()
 }
 
 #[utoipa::path(

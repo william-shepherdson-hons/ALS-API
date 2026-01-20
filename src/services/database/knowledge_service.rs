@@ -1,5 +1,5 @@
 use tokio_postgres::NoTls;
-use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate}};
+use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, skill_progression::SkillProgression}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum KnowledgeError {
@@ -74,4 +74,31 @@ pub async fn get_skill_id(skill_name: &str) -> Result<i32, KnowledgeError> {
         .map_err(|e| KnowledgeError::Database(format!("Failed to fetch skill id: {e}")))?;
 
     Ok(row.get(0))
+}
+
+pub async fn get_all_progression_score(user_id: i32) -> Result<Vec<SkillProgression>, KnowledgeError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+    let rows = client.query("SELECT SKILLS.skill_name, PROGRESSION.progression FROM PROGRESSION INNER JOIN SKILLS ON SKILLS.skill_id = PROGRESSION.skill_id WHERE user_id = $1", &[&user_id])
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to gather skills: {e}")))?;
+    let progression: Vec<SkillProgression> = rows
+        .into_iter()
+        .map(|row| SkillProgression {
+            skill_name: row.get("skill_name"),
+            progression: row.get("progression"),
+        })
+        .collect();
+
+    Ok(progression)
 }
