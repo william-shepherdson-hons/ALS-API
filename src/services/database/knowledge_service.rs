@@ -93,12 +93,16 @@ pub async fn get_all_progression_score(user_id: i32) -> Result<Vec<SkillProgress
         .await
         .map_err(|e| KnowledgeError::Database(format!("Failed to gather skills: {e}")))?;
     let progression: Vec<SkillProgression> = rows
-        .into_iter()
-        .map(|row| SkillProgression {
-            skill_name: row.get("skill_name"),
-            progression: row.get("progression"),
-        })
-        .collect();
+    .into_iter()
+    .map(|row| {
+        let skill_name: String = row.get(0);
+        let progression: f64 = row.get(1); 
+        SkillProgression {
+            skill_name,
+            progression,
+        }
+    })
+    .collect();
 
     Ok(progression)
 }
