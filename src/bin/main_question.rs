@@ -1,4 +1,4 @@
-use als_api::{enums::difficulty::Difficulty, middleware::auth::AuthenticatedUser, services::{database::question_service::get_module_names, generator::modules::{fetch_module_list, generate_question}}, structs::question_pair::QuestionPair};
+use als_api::{enums::difficulty::Difficulty, middleware::auth::AuthenticatedUser, services::{database::{knowledge_service::{get_knowledge_score, get_skill_id}, question_service::get_module_names}, generator::modules::{fetch_module_list, generate_question}}, structs::{knowledge_score_request::KnowledgeScoreRequest, question_pair::QuestionPair}};
 use axum::{
     Json, Router, response::IntoResponse, routing::get
 };
@@ -33,7 +33,7 @@ async fn main() {
     let app = Router::new()
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/ping", get(pong))
-        .route("/generate/{module}/{difficulty}", get(generate))
+        .route("/generate/{module}/", get(generate))
         .route("/internal_modules", get(get_internal_modules))
         .route("/modules", get(get_modules));
     
@@ -94,10 +94,9 @@ async fn get_modules(_auth: AuthenticatedUser) -> impl IntoResponse {
 
 #[utoipa::path(
     get,
-    path = "/generate/{module}/{difficulty}",
+    path = "/generate/{module}/",
     params(
         ("module" = String, Path, description = "Module ID"),
-        ("difficulty" = String, Path, description = "Difficulty of question")
     ),
     responses(
         (status = 200, description = "Generated question", body = QuestionPair),
@@ -108,19 +107,26 @@ async fn get_modules(_auth: AuthenticatedUser) -> impl IntoResponse {
         ("bearer_auth" = [])
     )
 )]
-async fn generate(_auth: AuthenticatedUser, Path((module, difficulty)): Path<(String, String)>) -> impl IntoResponse {
-    // Parse difficulty from string
-    let difficulty = match difficulty.to_lowercase().as_str() {
-        "easy" => Difficulty::Easy,
-        "medium" => Difficulty::Medium,
-        "hard" => Difficulty::Hard,
-        _ => {
-            return (
-                StatusCode::BAD_REQUEST,
-                format!("Invalid difficulty: {}. Must be one of: easy, medium, hard", difficulty)
-            ).into_response();
+async fn generate(auth: AuthenticatedUser, Path(module): Path<String>) -> impl IntoResponse {
+    let skill_id = match get_skill_id(&module).await {
+        Ok(skill) => skill,
+        Err(e) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, format!("Failed to fetch skill id: {}", e)).into_response();
         }
     };
+    let student_id = auth.claims.uid;
+    let progression = match get_knowledge_score(KnowledgeScoreRequest{skill_id, student_id}).await {
+        Ok(progression) => progression,
+        Err(e) => {
+            return (StatusCode::SERVICE_UNAVAILABLE, format!("Failed to fetch progression: {}", e)).into_response();
+        }
+    };
+    let difficulty = match progression {
+        x if x < 0.33 => Difficulty::Easy,
+        x if x < 0.66 => Difficulty::Medium,
+        _ => Difficulty::Hard, 
+    };
+
     
     match generate_question(module, difficulty).await {
         Ok(question_pair) => Json(question_pair).into_response(),
