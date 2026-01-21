@@ -1,48 +1,45 @@
-pub fn skill_name_to_api_string(input: &str) -> String {
-    let normalized = input
-        .to_lowercase()
-        .replace('–', "-")
-        .replace('&', "and");
-    
-    let domain = classify_domain(&normalized);
-    let api_name = create_api_name(&normalized);
-    
-    format!("{domain}__{api_name}")
-}
-
-fn classify_domain(s: &str) -> &'static str {
-    match s {
-        s if s.contains("linear equation") => "algebra",
-        s if s.contains("polynomial") || s.contains("sequence") => "algebra",
-        s if s.contains("addition") || s.contains("subtraction") 
-            || s.contains("multiplication") || s.contains("division")
-            || s.contains("surd") || s.contains("root") => "arithmetic",
-        s if s.contains("differentiat") => "calculus",
-        s if s.contains("compare") || s.contains("closest") 
-            || s.contains("largest") || s.contains("sorting")
-            || s.contains("pairwise") => "comparison",
-        s if s.contains("conversion") || s.contains("time") => "measurement",
-        s if s.contains("prime") || s.contains("factor")
-            || s.contains("gcd") || s.contains("lcm")
-            || s.contains("remainder") || s.contains("round")
-            || s.contains("place value") || s.contains("base") => "numbers",
-        s if s.contains("probability") => "probability",
-        _ => "general",
+pub fn skill_name_to_api_string(input: &str) -> Option<&'static str> {
+    match input {
+        "Linear equations in one variable" => Some("algebra__linear_1d"),
+        "Linear equations in two variables" => Some("algebra__linear_2d"),
+        "Finding roots of polynomials" => Some("algebra__polynomial_roots"),
+        "Finding the next term in a sequence" => Some("algebra__sequence_next_term"),
+        "Finding the nth term of a sequence" => Some("algebra__sequence_nth_term"),
+        "Addition and subtraction" => Some("arithmetic__add_or_sub"),
+        "Multiplication" => Some("arithmetic__mul"),
+        "Division" => Some("arithmetic__div"),
+        "Mixed arithmetic operations" => Some("arithmetic__mixed"),
+        "Multiple addition and subtraction" => Some("arithmetic__add_sub_multiple"),
+        "Multiple multiplication and division" => Some("arithmetic__mul_div_multiple"),
+        "Addition and subtraction in different bases" => Some("arithmetic__add_or_sub_in_base"),
+        "Nearest integer root" => Some("arithmetic__nearest_integer_root"),
+        "Simplifying surds" => Some("arithmetic__simplify_surd"),
+        "Differentiation" => Some("calculus__differentiate"),
+        "Differentiation using the chain rule" => Some("calculus__differentiate_composed"),
+        "Finding the closest value" => Some("comparison__closest"),
+        "Finding the kth largest value" => Some("comparison__kth_biggest"),
+        "Pairwise comparison" => Some("comparison__pair"),
+        "Sorting values" => Some("comparison__sort"),
+        "Unit conversion" => Some("measurement__conversion"),
+        "Time calculations" => Some("measurement__time"),
+        "Base conversion" => Some("numbers__base_conversion"),
+        "Place value" => Some("numbers__place_value"),
+        "Division with remainder" => Some("numbers__div_remainder"),
+        "Greatest common divisor" => Some("numbers__gcd"),
+        "Least common multiple" => Some("numbers__lcm"),
+        "Checking if a number is a factor" => Some("numbers__is_factor"),
+        "Listing prime factors" => Some("numbers__list_prime_factors"),
+        "Prime number checking" => Some("numbers__is_prime"),
+        "Rounding numbers" => Some("numbers__round_number"),
+        "Polynomial addition" => Some("polynomials__add"),
+        "Collecting like terms" => Some("polynomials__collect"),
+        "Expanding polynomial expressions" => Some("polynomials__expand"),
+        "Composing polynomials" => Some("polynomials__compose"),
+        "Evaluating polynomials" => Some("polynomials__evaluate"),
+        "Identifying polynomial coefficients" => Some("polynomials__coefficient_named"),
+        "Simplifying powers in polynomials" => Some("polynomials__simplify_power"),
+        "Probability without replacement – outcome sets" => Some("probability__swr_p_level_set"),
+        "Probability without replacement – outcome sequences" => Some("probability__swr_p_sequence"),
+        _ => None,
     }
-}
-
-fn create_api_name(s: &str) -> String {
-    s.replace("probability without replacement", "swr")
-        .replace("greatest common divisor", "gcd")
-        .replace("least common multiple", "lcm")
-        .replace("kth", "kth")
-        .replace("one variable", "1d")
-        .replace("two variables", "2d")
-        .replace("chain rule", "composed")
-        .replace("outcome sets", "p_level_set")
-        .replace("outcome sequences", "p_sequence")
-        .replace(|c: char| !c.is_ascii_alphanumeric() && c != ' ', "")
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join("_")
 }

@@ -30,12 +30,12 @@ struct GenerateResponse {
 
 pub async fn generate_question(module: String, difficulty: Difficulty) -> Result<QuestionPair, GeneratorError>{
     let client = Client::new();
-    let module = skill_name_to_api_string(&module);
+    let module = skill_name_to_api_string(&module).unwrap_or("error");
     let response = client
         .get("http://172.18.0.12:5000/generate")
         .query(&[
             ("filter", module),
-            ("difficulty", difficulty.to_string())
+            ("difficulty", &difficulty.to_string())
         ])
         .send()
         .await
