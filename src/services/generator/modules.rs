@@ -1,7 +1,7 @@
 use reqwest::Client;
 use serde::Deserialize;
 
-use crate::{enums::difficulty::Difficulty, structs::{module_list::ModuleList, question_pair::QuestionPair}};
+use crate::{enums::difficulty::Difficulty, helpers::topic_conversion::skill_name_to_api_string, structs::{module_list::ModuleList, question_pair::QuestionPair}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum GeneratorError {
@@ -30,6 +30,7 @@ struct GenerateResponse {
 
 pub async fn generate_question(module: String, difficulty: Difficulty) -> Result<QuestionPair, GeneratorError>{
     let client = Client::new();
+    let module = skill_name_to_api_string(&module);
     let response = client
         .get("http://172.18.0.12:5000/generate")
         .query(&[
