@@ -202,10 +202,11 @@ pub async fn fetch_details(claims: &Claims) -> Result<Account, AccountError> {
             eprintln!("Postgres connection error: {e}");
         }
     });
-    let row = client.query_one("SELECT first_name, last_name FROM USERS WHERE user_id=$1", &[&claims.uid])
+    let row = client.query_one("SELECT first_name, last_name, username FROM USERS WHERE user_id=$1", &[&claims.uid])
         .await
         .map_err(|e| AccountError::Database(format!("Failed to find user: {e}")))?;
     let first_name: String = row.get(0);
     let last_name: String = row.get(1);
-    Ok(Account { first_name: first_name, last_name: last_name, username: "none".to_string(), password: "none".to_string() })
+    let username: String = row.get(2);
+    Ok(Account { first_name: first_name, last_name: last_name, username: username, password: "none".to_string() })
 }

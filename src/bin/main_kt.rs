@@ -259,7 +259,8 @@ async fn fetch_user_details(auth: AuthenticatedUser) -> impl IntoResponse {
     match fetch_details(&auth.claims).await {
         Ok(account) => (StatusCode::OK, Json(serde_json::json!({
             "first_name" : account.first_name,
-            "last_name" : account.last_name
+            "last_name" : account.last_name,
+            "username" : account.username,
         }))).into_response(),
         Err(e) => {
             (StatusCode::BAD_REQUEST, format!("Failed to get account: {e}")).into_response()
