@@ -96,7 +96,7 @@ async fn get_modules(_auth: AuthenticatedUser) -> impl IntoResponse {
     get,
     path = "/generate/{module}/",
     params(
-        ("module" = String, Path, description = "Module ID"),
+        ("module" = String, Path, description = "Skill Name"),
     ),
     responses(
         (status = 200, description = "Generated question", body = QuestionPair),
