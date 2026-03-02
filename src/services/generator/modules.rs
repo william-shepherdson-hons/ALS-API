@@ -67,6 +67,8 @@ pub async fn generate_word_question(module: String, difficulty: Difficulty) -> R
         "Take the question below and convert it into a word question \
         which makes it easier to understand. \
         Output HTML only. Do not include explanation. \
+        This will be inserted into a larger page \
+        Ensure proper subscript and superscript formatting \
         Keep the answer identical.\n\n{}",
         question_pair.question
     );
@@ -99,14 +101,29 @@ pub async fn generate_word_question(module: String, difficulty: Difficulty) -> R
         .map_err(|e| GeneratorError::GPT(format!("JSON parse error: {e}")))?;
 
 
-    let output_text = res["output_text"]
-        .as_str()
-        .ok_or_else(|| GeneratorError::GPT(format!(
-            "Missing output_text. Full response: {:#?}",
-            res
-        )))?
-        .to_string();
-
+    let output_text = res["output"]
+    .as_array()
+    .and_then(|outputs| {
+        outputs.iter().find_map(|item| {
+            if item["type"] == "message" {
+                item["content"]
+                    .as_array()
+                    .and_then(|contents| {
+                        contents.iter().find_map(|c| {
+                            if c["type"] == "output_text" {
+                                c["text"].as_str()
+                            } else {
+                                None
+                            }
+                        })
+                    })
+            } else {
+                None
+            }
+        })
+    })
+    .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?
+    .to_string();
     question_pair.question = output_text;
 
     Ok(question_pair)
