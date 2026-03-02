@@ -1,12 +1,14 @@
 use reqwest::Client;
 use serde::Deserialize;
 
-use crate::{enums::difficulty::Difficulty, helpers::topic_conversion::skill_name_to_api_string, structs::{module_list::ModuleList, question_pair::QuestionPair}};
+use crate::{enums::difficulty::Difficulty, helpers::topic_conversion::skill_name_to_api_string, structs::{module_list::ModuleList, question_pair::{self, QuestionPair}}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum GeneratorError {
     #[error("Connection to generator error: {0}")]
     Connection(String),
+    #[error("ChatGPT error: {0}")]
+    GPT(String),
     #[error("Unexpected error: {0}")]
     Other(#[from] anyhow::Error),
 }
@@ -50,4 +52,45 @@ pub async fn generate_question(module: String, difficulty: Difficulty) -> Result
             .ok_or_else(|| GeneratorError::Connection(format!("No question generated")))?;
     Ok(result)
 
+}
+
+pub async fn generate_word_question(module: String,difficulty: Difficulty) -> Result<QuestionPair, GeneratorError> {
+
+    let mut question_pair = generate_question(module, difficulty).await?;
+
+    let api_key = std::env::var("OPENAI_API_KEY")
+        .map_err(|_| GeneratorError::GPT("Failed to fetch API Key".into()))?;
+
+    let client = reqwest::Client::new();
+
+    let prompt = format!(
+        "Take the question below and convert it into a word question which makes it easier to understand. \
+        Output it with HTML formatting and keep the answer the same:\n\n{}",
+        question_pair.question
+    );
+
+    let res: serde_json::Value = client
+        .post("https://api.openai.com/v1/responses")
+        .bearer_auth(api_key)
+        .json(&serde_json::json!({
+            "model": "gpt-5-nano",
+            "input": prompt
+        }))
+        .send()
+        .await
+        .map_err(|e| GeneratorError::GPT(e.to_string()))?
+        .json()
+        .await
+        .map_err(|e| GeneratorError::GPT(e.to_string()))?;
+
+    // Extract generated text safely
+    let output_text = res["output"][0]["content"][0]["text"]
+        .as_str()
+        .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?
+        .to_string();
+
+    // Update question
+    question_pair.question = output_text;
+
+    Ok(question_pair)
 }
