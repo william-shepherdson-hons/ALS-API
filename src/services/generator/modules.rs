@@ -84,10 +84,29 @@ pub async fn generate_word_question(module: String,difficulty: Difficulty) -> Re
         .map_err(|e| GeneratorError::GPT(e.to_string()))?;
 
     // Extract generated text safely
-    let output_text = res["output"][0]["content"][0]["text"]
-        .as_str()
-        .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?
-        .to_string();
+    let output_text = res["output"]
+    .as_array()
+    .and_then(|outputs| {
+        outputs.iter().find_map(|item| {
+            if item["type"] == "message" {
+                item["content"]
+                    .as_array()
+                    .and_then(|contents| {
+                        contents.iter().find_map(|c| {
+                            if c["type"] == "output_text" {
+                                c["text"].as_str()
+                            } else {
+                                None
+                            }
+                        })
+                    })
+            } else {
+                None
+            }
+        })
+    })
+    .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?
+    .to_string();
 
     // Update question
     question_pair.question = output_text;
