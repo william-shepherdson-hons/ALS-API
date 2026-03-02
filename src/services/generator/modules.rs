@@ -1,7 +1,7 @@
 use reqwest::Client;
 use serde::Deserialize;
 
-use crate::{enums::difficulty::Difficulty, helpers::topic_conversion::skill_name_to_api_string, structs::{module_list::ModuleList, question_pair::{self, QuestionPair}}};
+use crate::{enums::difficulty::Difficulty, helpers::topic_conversion::skill_name_to_api_string, structs::{module_list::ModuleList, question_pair::{QuestionPair}}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum GeneratorError {
@@ -54,7 +54,7 @@ pub async fn generate_question(module: String, difficulty: Difficulty) -> Result
 
 }
 
-pub async fn generate_word_question(module: String,difficulty: Difficulty) -> Result<QuestionPair, GeneratorError> {
+pub async fn generate_word_question(module: String, difficulty: Difficulty) -> Result<QuestionPair, GeneratorError> {
 
     let mut question_pair = generate_question(module, difficulty).await?;
 
@@ -64,12 +64,14 @@ pub async fn generate_word_question(module: String,difficulty: Difficulty) -> Re
     let client = reqwest::Client::new();
 
     let prompt = format!(
-        "Take the question below and convert it into a word question which makes it easier to understand. \
-        Output it with HTML formatting and keep the answer the same:\n\n{}",
+        "Take the question below and convert it into a word question \
+        which makes it easier to understand. \
+        Output HTML only. Do not include explanation. \
+        Keep the answer identical.\n\n{}",
         question_pair.question
     );
 
-    let res: serde_json::Value = client
+    let response = client
         .post("https://api.openai.com/v1/responses")
         .bearer_auth(api_key)
         .json(&serde_json::json!({
@@ -78,37 +80,33 @@ pub async fn generate_word_question(module: String,difficulty: Difficulty) -> Re
         }))
         .send()
         .await
-        .map_err(|e| GeneratorError::GPT(e.to_string()))?
+        .map_err(|e| GeneratorError::GPT(format!("Request failed: {e}")))?;
+
+    let status = response.status();
+
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+
+        return Err(GeneratorError::GPT(format!(
+            "OpenAI returned {}: {}",
+            status, body
+        )));
+    }
+
+    let res: serde_json::Value = response
         .json()
         .await
-        .map_err(|e| GeneratorError::GPT(e.to_string()))?;
+        .map_err(|e| GeneratorError::GPT(format!("JSON parse error: {e}")))?;
 
-    // Extract generated text safely
-    let output_text = res["output"]
-    .as_array()
-    .and_then(|outputs| {
-        outputs.iter().find_map(|item| {
-            if item["type"] == "message" {
-                item["content"]
-                    .as_array()
-                    .and_then(|contents| {
-                        contents.iter().find_map(|c| {
-                            if c["type"] == "output_text" {
-                                c["text"].as_str()
-                            } else {
-                                None
-                            }
-                        })
-                    })
-            } else {
-                None
-            }
-        })
-    })
-    .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?
-    .to_string();
 
-    // Update question
+    let output_text = res["output_text"]
+        .as_str()
+        .ok_or_else(|| GeneratorError::GPT(format!(
+            "Missing output_text. Full response: {:#?}",
+            res
+        )))?
+        .to_string();
+
     question_pair.question = output_text;
 
     Ok(question_pair)
