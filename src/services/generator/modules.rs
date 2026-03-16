@@ -114,7 +114,10 @@ pub async fn generate_word_questions(
     let api_key = std::env::var("OPENAI_API_KEY")
         .map_err(|_| GeneratorError::GPT("Failed to fetch API key".into()))?;
 
-    let client = Client::new();
+    let client = Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| GeneratorError::GPT(format!("Failed to build HTTP client: {e}")))?;
 
     let question_list: Vec<String> =
         questions.iter().map(|q| q.question.clone()).collect();
