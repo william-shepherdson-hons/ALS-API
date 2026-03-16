@@ -8,8 +8,8 @@ use als_api::{
         },
         generator::modules::{
             fetch_module_list,
-            generate_question,
-            generate_word_question
+            generate_questions,
+            generate_word_questions,
         },
     },
     structs::{
@@ -19,7 +19,7 @@ use als_api::{
 };
 
 use axum::{
-    extract::Path,
+    extract::{Path, Query},
     response::IntoResponse,
     routing::get,
     Json, Router,
@@ -33,6 +33,13 @@ use utoipa::{
 };
 
 use utoipa_swagger_ui::SwaggerUi;
+
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct GenerateQuery {
+    amount: Option<usize>,
+}
 
 #[tokio::main]
 async fn main() {
@@ -75,8 +82,8 @@ async fn main() {
                 .url("/api-docs/openapi.json", ApiDoc::openapi()),
         )
         .route("/ping", get(pong))
-        .route("/generate/{module}/", get(generate))
-        .route("/generate_word/{module}/", get(generate_word)) // <-- NEW
+        .route("/generate/{module}", get(generate))
+        .route("/generate_word/{module}", get(generate_word))
         .route("/internal_modules", get(get_internal_modules))
         .route("/modules", get(get_modules));
 
@@ -102,11 +109,9 @@ async fn pong() -> &'static str {
     get,
     path = "/internal_modules",
     responses(
-        (status = 200, description = "List of internal Modules", body = [String])
+        (status = 200, description = "List of internal modules", body = [String])
     ),
-    security(
-        ("bearer_auth" = [])
-    )
+    security(("bearer_auth" = []))
 )]
 async fn get_internal_modules(
     _auth: AuthenticatedUser,
@@ -116,8 +121,7 @@ async fn get_internal_modules(
         Err(e) => (
             StatusCode::SERVICE_UNAVAILABLE,
             format!("Failed to fetch module list: {}", e),
-        )
-            .into_response(),
+        ).into_response(),
     }
 }
 
@@ -125,11 +129,9 @@ async fn get_internal_modules(
     get,
     path = "/modules",
     responses(
-        (status = 200, description = "List of Modules", body = [String])
+        (status = 200, description = "List of modules", body = [String])
     ),
-    security(
-        ("bearer_auth" = [])
-    )
+    security(("bearer_auth" = []))
 )]
 async fn get_modules(
     _auth: AuthenticatedUser,
@@ -139,54 +141,52 @@ async fn get_modules(
         Err(e) => (
             StatusCode::SERVICE_UNAVAILABLE,
             format!("Failed to fetch module list: {}", e),
-        )
-            .into_response(),
+        ).into_response(),
     }
 }
 
 #[utoipa::path(
     get,
-    path = "/generate/{module}/",
+    path = "/generate/{module}",
     params(
-        ("module" = String, Path, description = "Skill Name"),
+        ("module" = String, Path, description = "Skill name"),
+        ("amount" = Option<usize>, Query, description = "Number of questions")
     ),
     responses(
-        (status = 200, description = "Generated question", body = QuestionPair),
+        (status = 200, description = "Generated questions", body = [QuestionPair]),
         (status = 503, description = "Generator service unavailable")
     ),
-    security(
-        ("bearer_auth" = [])
-    )
+    security(("bearer_auth" = []))
 )]
 async fn generate(
     auth: AuthenticatedUser,
     Path(module): Path<String>,
+    Query(query): Query<GenerateQuery>,
 ) -> impl IntoResponse {
+
+    let amount = query.amount.unwrap_or(1).min(50);
+
     let skill_id = match get_skill_id(&module).await {
         Ok(skill) => skill,
         Err(e) => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("Failed to fetch skill id: {}", e),
-            )
-                .into_response();
+            ).into_response();
         }
     };
 
     let student_id = auth.claims.uid;
 
     let progression = match get_knowledge_score(
-        KnowledgeScoreRequest { skill_id, student_id },
-    )
-    .await
-    {
+        KnowledgeScoreRequest { skill_id, student_id }
+    ).await {
         Ok(p) => p,
         Err(e) => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("Failed to fetch progression: {}", e),
-            )
-                .into_response();
+            ).into_response();
         }
     };
 
@@ -196,59 +196,57 @@ async fn generate(
         _ => Difficulty::Hard,
     };
 
-    match generate_question(module, difficulty).await {
-        Ok(question_pair) => Json(question_pair).into_response(),
+    match generate_questions(module, difficulty, amount).await {
+        Ok(questions) => Json(questions).into_response(),
         Err(e) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            format!("Failed to generate question: {}", e),
-        )
-            .into_response(),
+            format!("Failed to generate questions: {}", e),
+        ).into_response(),
     }
 }
 
 #[utoipa::path(
     get,
-    path = "/generate_word/{module}/",
+    path = "/generate_word/{module}",
     params(
-        ("module" = String, Path, description = "Skill Name"),
+        ("module" = String, Path, description = "Skill name"),
+        ("amount" = Option<usize>, Query, description = "Number of questions")
     ),
     responses(
-        (status = 200, description = "Generated word question", body = QuestionPair),
+        (status = 200, description = "Generated word questions", body = [QuestionPair]),
         (status = 503, description = "Generator service unavailable")
     ),
-    security(
-        ("bearer_auth" = [])
-    )
+    security(("bearer_auth" = []))
 )]
 async fn generate_word(
     auth: AuthenticatedUser,
     Path(module): Path<String>,
+    Query(query): Query<GenerateQuery>,
 ) -> impl IntoResponse {
+
+    let amount = query.amount.unwrap_or(1).min(50);
+
     let skill_id = match get_skill_id(&module).await {
         Ok(skill) => skill,
         Err(e) => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("Failed to fetch skill id: {}", e),
-            )
-                .into_response();
+            ).into_response();
         }
     };
 
     let student_id = auth.claims.uid;
 
     let progression = match get_knowledge_score(
-        KnowledgeScoreRequest { skill_id, student_id },
-    )
-    .await
-    {
+        KnowledgeScoreRequest { skill_id, student_id }
+    ).await {
         Ok(p) => p,
         Err(e) => {
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("Failed to fetch progression: {}", e),
-            )
-                .into_response();
+            ).into_response();
         }
     };
 
@@ -258,12 +256,11 @@ async fn generate_word(
         _ => Difficulty::Hard,
     };
 
-    match generate_word_question(module, difficulty).await {
-        Ok(question_pair) => Json(question_pair).into_response(),
+    match generate_word_questions(module, difficulty, amount).await {
+        Ok(questions) => Json(questions).into_response(),
         Err(e) => (
             StatusCode::SERVICE_UNAVAILABLE,
-            format!("Failed to generate word question: {}", e),
-        )
-            .into_response(),
+            format!("Failed to generate word questions: {}", e),
+        ).into_response(),
     }
 }
