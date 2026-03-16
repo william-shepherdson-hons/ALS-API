@@ -1,5 +1,6 @@
 use reqwest::Client;
 use serde::Deserialize;
+use futures::future::join_all;
 
 use crate::{
     enums::difficulty::Difficulty,
@@ -27,21 +28,58 @@ struct GenerateResponse {
     items: Vec<QuestionPair>,
 }
 
+static GENERATOR_URL: &str = "http://172.18.0.12:5000";
+
 pub async fn fetch_module_list() -> Result<Vec<String>, GeneratorError> {
-    let body = reqwest::get("http://172.18.0.12:5000/modules")
+
+    let body = reqwest::get(format!("{GENERATOR_URL}/modules"))
         .await
         .map_err(|e| GeneratorError::Connection(
-            format!("Failed to get a response from generator: {}", e)
+            format!("Failed to get generator response: {e}")
         ))?;
 
     let module_list: ModuleList = body
         .json()
         .await
         .map_err(|e| GeneratorError::Connection(
-            format!("Failed to parse generator response: {}", e)
+            format!("Failed to parse generator response: {e}")
         ))?;
 
     Ok(module_list.modules)
+}
+
+async fn generate_single_question(
+    module: String,
+    difficulty: Difficulty,
+) -> Result<QuestionPair, GeneratorError> {
+
+    let client = Client::new();
+
+    let module = skill_name_to_api_string(&module).unwrap_or("error");
+
+    let response = client
+        .get(format!("{GENERATOR_URL}/generate"))
+        .query(&[
+            ("filter", module),
+            ("difficulty", &difficulty.to_string())
+        ])
+        .send()
+        .await
+        .map_err(|e| GeneratorError::Connection(
+            format!("Failed to contact generator: {e}")
+        ))?;
+
+    let body: GenerateResponse = response
+        .json()
+        .await
+        .map_err(|e| GeneratorError::Connection(
+            format!("Failed to parse generator response: {e}")
+        ))?;
+
+    body.items
+        .into_iter()
+        .next()
+        .ok_or_else(|| GeneratorError::Connection("No question generated".into()))
 }
 
 pub async fn generate_questions(
@@ -50,34 +88,19 @@ pub async fn generate_questions(
     amount: usize,
 ) -> Result<Vec<QuestionPair>, GeneratorError> {
 
-    let client = Client::new();
-    let module = skill_name_to_api_string(&module).unwrap_or("error");
+    let futures = (0..amount).map(|_| {
+        generate_single_question(module.clone(), difficulty)
+    });
 
-    let response = client
-        .get("http://172.18.0.12:5000/generate")
-        .query(&[
-            ("filter", module),
-            ("difficulty", &difficulty.to_string()),
-            ("amount", &amount.to_string())
-        ])
-        .send()
-        .await
-        .map_err(|e| GeneratorError::Connection(
-            format!("Failed to get a response from generator: {}", e)
-        ))?;
+    let results = join_all(futures).await;
 
-    let body: GenerateResponse = response
-        .json()
-        .await
-        .map_err(|e| GeneratorError::Connection(
-            format!("Failed to parse generator response: {}", e)
-        ))?;
+    let mut questions = Vec::with_capacity(amount);
 
-    if body.items.is_empty() {
-        return Err(GeneratorError::Connection("No questions generated".into()));
+    for result in results {
+        questions.push(result?);
     }
 
-    Ok(body.items)
+    Ok(questions)
 }
 
 pub async fn generate_word_questions(
@@ -89,9 +112,9 @@ pub async fn generate_word_questions(
     let mut questions = generate_questions(module, difficulty, amount).await?;
 
     let api_key = std::env::var("OPENAI_API_KEY")
-        .map_err(|_| GeneratorError::GPT("Failed to fetch API Key".into()))?;
+        .map_err(|_| GeneratorError::GPT("Failed to fetch API key".into()))?;
 
-    let client = reqwest::Client::new();
+    let client = Client::new();
 
     let question_list: Vec<String> =
         questions.iter().map(|q| q.question.clone()).collect();
@@ -127,7 +150,7 @@ Questions:
         }))
         .send()
         .await
-        .map_err(|e| GeneratorError::GPT(format!("Request failed: {e}")))?;
+        .map_err(|e| GeneratorError::GPT(format!("OpenAI request failed: {e}")))?;
 
     let status = response.status();
 
@@ -166,7 +189,7 @@ Questions:
                 }
             })
         })
-        .ok_or_else(|| GeneratorError::GPT("Invalid response format".into()))?;
+        .ok_or_else(|| GeneratorError::GPT("Invalid OpenAI response format".into()))?;
 
     let transformed: Vec<serde_json::Value> =
         serde_json::from_str(output_text)
