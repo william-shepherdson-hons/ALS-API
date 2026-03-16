@@ -6,7 +6,7 @@ use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
     middleware::auth::AuthenticatedUser, services::database::{
-        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_all_progression_score, get_knowledge_score, get_skill_id, update_knowledge_score}
+        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_all_progression_score, get_knowledge_score, get_skill_id, update_knowledge_score, log_progress}
     }, structs::{
         account::Account, knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, sign_in::SignIn, skill_progression::SkillProgression, token_validation::TokenValidation
     }
@@ -19,7 +19,7 @@ async fn main() {
     
     #[derive(OpenApi)]
     #[openapi(
-        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details, get_progression), 
+        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details, get_progression, log_progress_endpoint), 
         components(schemas()),
         modifiers(&SecurityAddon),
         tags()
@@ -48,6 +48,7 @@ async fn main() {
         .merge(SwaggerUi::new("/docs").url("/api-docs/openapi.json", ApiDoc::openapi()))
         .route("/ping", get(pong))
         .route("/students/skills/{skillID}/performance", patch(skill_update))
+        .route("/students/skills/{skillID}/log", post(log_progress_endpoint))
         .route("/accounts/register", post(register_account))
         .route("/accounts/login", post(login))
         .route("/accounts/validate", post(validate_token))
@@ -92,37 +93,50 @@ async fn skill_update(
     let student_id = auth.claims.uid;
     let skill_id = match get_skill_id(&skill).await {
         Ok(skill_id) => skill_id,
-        Err(e) => {
-            return (
-                StatusCode::BAD_REQUEST,
-                format!("Failed to get skill id: {e}")
-            ).into_response();
-        }
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to get skill id: {e}")).into_response()
     };
 
     let fetch_skill = KnowledgeScoreRequest {
-        skill_id: skill_id,
-        student_id: student_id
+        skill_id,
+        student_id
     };
     let existing_knowledge_score = match get_knowledge_score(fetch_skill).await {
         Ok(score) => score,
-        Err(e) => {
-            return (StatusCode::BAD_REQUEST, format!("Failed to fetch skill: {e}")).into_response();
-        }
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to fetch skill: {e}")).into_response()
     };
     let new_knowledge_score = calculate_mastery(existing_knowledge_score, 0.1, 0.1, 0.1, body.correct).await;
     let knowledge_update = KnowledgeScoreUpdate {
-        skill_id: skill_id,
-        student_id: student_id,
+        skill_id,
+        student_id,
         score: new_knowledge_score
     };
     let _ = match update_knowledge_score(knowledge_update).await {
         Ok(_) => (),
-        Err(e) => {
-            return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response();
-        }
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response()
     };
     Json(new_knowledge_score).into_response()
+}
+
+#[utoipa::path(
+    post,
+    path = "/students/skills/{skillID}/log",
+    params(
+        ("skillID" = i32, Path, description = "Skill ID to log progression for")
+    ),
+    responses(
+        (status = 200, description = "Progress logged successfully"),
+        (status = 400, description = "Failed to log progression")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+async fn log_progress_endpoint(auth: AuthenticatedUser, Path(skill_id): Path<i32>) -> impl IntoResponse {
+    let user_id = auth.claims.uid;
+    match log_progress(user_id, skill_id).await {
+        Ok(_) => (StatusCode::OK, "Progress logged successfully").into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to log progression: {e}")).into_response(),
+    }
 }
 
 #[utoipa::path(
@@ -137,7 +151,7 @@ async fn skill_update(
 async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
     match create_account(account).await {
         Ok(_) => (StatusCode::CREATED, "Account created successfully").into_response(),
-        Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to create account: {e}")).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to create account: {e}")).into_response()
     }
 }
 
@@ -145,21 +159,18 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
     get,
     path = "/students/skills/",
     responses(
-        (status = 200, description = "Json  of skill progression", body = Vec<SkillProgression>),
+        (status = 200, description = "Json of skill progression", body = Vec<SkillProgression>),
         (status = 400, description = "Bad request")
     ),
     security(
         ("bearer_auth" = [])
     )
 )]
-
-async fn get_progression(auth: AuthenticatedUser) -> impl  IntoResponse {
+async fn get_progression(auth: AuthenticatedUser) -> impl IntoResponse {
     let user_id = auth.claims.uid;
     let progression = match get_all_progression_score(user_id).await {
         Ok(progression) => progression,
-        Err(e) => {
-            return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response();
-        }
+        Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response()
     };
     Json(progression).into_response()
 }
@@ -180,12 +191,8 @@ async fn login(Json(credentials): Json<SignIn>) -> impl IntoResponse {
             let token = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(token_bytes);
             (StatusCode::OK, token).into_response()
         },
-        Err(AccountError::Authentication(_)) => {
-            (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response()
-        },
-        Err(e) => {
-            (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response()
-        }
+        Err(AccountError::Authentication(_)) => (StatusCode::UNAUTHORIZED, "Invalid credentials").into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Login failed: {e}")).into_response()
     }
 }
 
@@ -202,32 +209,21 @@ async fn login(Json(credentials): Json<SignIn>) -> impl IntoResponse {
 async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoResponse {
     let token_bytes = match base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(&token_data.token) {
         Ok(bytes) => bytes,
-        Err(_) => {
-            return (StatusCode::BAD_REQUEST, "Invalid token format").into_response();
-        }
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid token format").into_response()
     };
-
     let token_array: [u8; 32] = match token_bytes.try_into() {
         Ok(arr) => arr,
-        Err(_) => {
-            return (StatusCode::BAD_REQUEST, "Invalid token length").into_response();
-        }
+        Err(_) => return (StatusCode::BAD_REQUEST, "Invalid token length").into_response()
     };
-
-
     match check_token(token_array).await {
         Ok(user_id) => {
             let jwt_secret = match std::env::var("JWT_SECRET") {
                 Ok(secret) => secret,
-                Err(_) => {
-                    return (StatusCode::SERVICE_UNAVAILABLE, "JWT Token not set").into_response();
-                }
+                Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "JWT Token not set").into_response()
             };
             let token = match issue_access_token(user_id.parse::<i32>().unwrap(), &jwt_secret) {
                 Ok(token) => token,
-                Err(_) => {
-                    return (StatusCode::BAD_REQUEST, "Failed to issue token").into_response();
-                }
+                Err(_) => return (StatusCode::BAD_REQUEST, "Failed to issue token").into_response()
             };
             (StatusCode::OK, Json(serde_json::json!({
                 "valid": true,
@@ -235,12 +231,8 @@ async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoRes
                 "jwt_token": token
             }))).into_response()
         },
-        Err(AccountError::Authentication(_)) => {
-            (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response()
-        },
-        Err(e) => {
-            (StatusCode::BAD_REQUEST, format!("Validation failed: {e}")).into_response()
-        }
+        Err(AccountError::Authentication(_)) => (StatusCode::UNAUTHORIZED, "Invalid or expired token").into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Validation failed: {e}")).into_response()
     }
 }
 
@@ -262,8 +254,6 @@ async fn fetch_user_details(auth: AuthenticatedUser) -> impl IntoResponse {
             "last_name" : account.last_name,
             "username" : account.username,
         }))).into_response(),
-        Err(e) => {
-            (StatusCode::BAD_REQUEST, format!("Failed to get account: {e}")).into_response()
-        }
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to get account: {e}")).into_response()
     }
 }

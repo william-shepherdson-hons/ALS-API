@@ -106,3 +106,37 @@ pub async fn get_all_progression_score(user_id: i32) -> Result<Vec<SkillProgress
 
     Ok(progression)
 }
+pub async fn log_progress(user_id: i32, skill_id: i32) -> Result<(), KnowledgeError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+
+    let row = client
+        .query_one(
+            "SELECT progression FROM progression WHERE user_id = $1 AND skill_id = $2",
+            &[&user_id, &skill_id],
+        )
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to fetch current progression: {e}")))?;
+
+    let current_progression: f64 = row.get(0);
+
+    client
+        .execute(
+            "INSERT INTO historical_progression (user_id, skill_id, progression) VALUES ($1, $2, $3)",
+            &[&user_id, &skill_id, &current_progression],
+        )
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to log historical progression: {e}")))?;
+
+    Ok(())
+}
