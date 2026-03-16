@@ -106,7 +106,7 @@ pub async fn get_all_progression_score(user_id: i32) -> Result<Vec<SkillProgress
 
     Ok(progression)
 }
-pub async fn log_progress(user_id: i32, skill_id: i32) -> Result<(), KnowledgeError> {
+pub async fn log_progress(user_id: i32, skill_name: &str) -> Result<(), KnowledgeError> {
     let connection_string = get_connection_string().await
         .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
 
@@ -119,6 +119,16 @@ pub async fn log_progress(user_id: i32, skill_id: i32) -> Result<(), KnowledgeEr
             eprintln!("Postgres connection error: {e}");
         }
     });
+
+    let row = client
+        .query_one(
+            "SELECT skill_id FROM skills WHERE skill_name = $1",
+            &[&skill_name],
+        )
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to fetch skill id: {e}")))?;
+
+    let skill_id: i32 = row.get(0);
 
     let row = client
         .query_one(

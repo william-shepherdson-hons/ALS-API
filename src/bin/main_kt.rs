@@ -119,9 +119,9 @@ async fn skill_update(
 
 #[utoipa::path(
     post,
-    path = "/students/skills/{skillID}/log",
+    path = "/students/skills/{skill_name}/log",
     params(
-        ("skillID" = i32, Path, description = "Skill ID to log progression for")
+        ("skill_name" = String, Path, description = "Skill name to log progression for")
     ),
     responses(
         (status = 200, description = "Progress logged successfully"),
@@ -131,9 +131,9 @@ async fn skill_update(
         ("bearer_auth" = [])
     )
 )]
-async fn log_progress_endpoint(auth: AuthenticatedUser, Path(skill_id): Path<i32>) -> impl IntoResponse {
+async fn log_progress_endpoint(auth: AuthenticatedUser, Path(skill_name): Path<String>) -> impl IntoResponse {
     let user_id = auth.claims.uid;
-    match log_progress(user_id, skill_id).await {
+    match log_progress(user_id, &skill_name).await {
         Ok(_) => (StatusCode::OK, "Progress logged successfully").into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to log progression: {e}")).into_response(),
     }
