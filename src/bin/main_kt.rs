@@ -5,10 +5,28 @@ use base64::Engine;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 use als_api::{
-    middleware::auth::AuthenticatedUser, services::database::{
-        account::{AccountError, check_password, check_token, create_account, fetch_details}, jwt::issue_access_token, knowledge_service::{get_all_progression_score, get_knowledge_score, get_skill_id, update_knowledge_score, log_progress}
-    }, structs::{
-        account::Account, knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, performance_update::PerformanceUpdate, sign_in::SignIn, skill_progression::SkillProgression, token_validation::TokenValidation
+    middleware::auth::AuthenticatedUser,
+    services::database::{
+        account::{AccountError, check_password, check_token, create_account, fetch_details},
+        jwt::issue_access_token,
+        knowledge_service::{
+            get_all_progression_score,
+            get_knowledge_score,
+            get_skill_id,
+            update_knowledge_score,
+            log_progress,
+            get_historical_skills,
+            get_skill_history // ✅ added
+        }
+    },
+    structs::{
+        account::Account,
+        knowledge_score_request::KnowledgeScoreRequest,
+        knowledge_score_update::KnowledgeScoreUpdate,
+        performance_update::PerformanceUpdate,
+        sign_in::SignIn,
+        skill_progression::SkillProgression,
+        token_validation::TokenValidation
     }
 };
 use als_algorithm::models::knowledge_tracing_model::calculate_mastery;
@@ -19,7 +37,18 @@ async fn main() {
     
     #[derive(OpenApi)]
     #[openapi(
-        paths(pong, skill_update, register_account, login, validate_token, fetch_user_details, get_progression, log_progress_endpoint), 
+        paths(
+            pong,
+            skill_update,
+            register_account,
+            login,
+            validate_token,
+            fetch_user_details,
+            get_progression,
+            log_progress_endpoint,
+            get_historical_skills_endpoint,
+            get_skill_history_endpoint
+        ), 
         components(schemas()),
         modifiers(&SecurityAddon),
         tags()
@@ -49,6 +78,8 @@ async fn main() {
         .route("/ping", get(pong))
         .route("/students/skills/{skillID}/performance", patch(skill_update))
         .route("/students/skills/{skillID}/log", post(log_progress_endpoint))
+        .route("/students/skills/history", get(get_historical_skills_endpoint))
+        .route("/students/skills/{skill_name}/history", get(get_skill_history_endpoint)) 
         .route("/accounts/register", post(register_account))
         .route("/accounts/login", post(login))
         .route("/accounts/validate", post(validate_token))
@@ -91,29 +122,38 @@ async fn skill_update(
     Json(body): Json<PerformanceUpdate>
 ) -> impl IntoResponse {
     let student_id = auth.claims.uid;
+
     let skill_id = match get_skill_id(&skill).await {
         Ok(skill_id) => skill_id,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to get skill id: {e}")).into_response()
     };
 
-    let fetch_skill = KnowledgeScoreRequest {
-        skill_id,
-        student_id
-    };
+    let fetch_skill = KnowledgeScoreRequest { skill_id, student_id };
+
     let existing_knowledge_score = match get_knowledge_score(fetch_skill).await {
         Ok(score) => score,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to fetch skill: {e}")).into_response()
     };
-    let new_knowledge_score = calculate_mastery(existing_knowledge_score, 0.1, 0.1, 0.1, body.correct).await;
+
+    let new_knowledge_score = calculate_mastery(
+        existing_knowledge_score,
+        0.1,
+        0.1,
+        0.1,
+        body.correct
+    ).await;
+
     let knowledge_update = KnowledgeScoreUpdate {
         skill_id,
         student_id,
         score: new_knowledge_score
     };
+
     let _ = match update_knowledge_score(knowledge_update).await {
         Ok(_) => (),
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response()
     };
+
     Json(new_knowledge_score).into_response()
 }
 
@@ -131,11 +171,67 @@ async fn skill_update(
         ("bearer_auth" = [])
     )
 )]
-async fn log_progress_endpoint(auth: AuthenticatedUser, Path(skill_name): Path<String>) -> impl IntoResponse {
+async fn log_progress_endpoint(
+    auth: AuthenticatedUser,
+    Path(skill_name): Path<String>
+) -> impl IntoResponse {
     let user_id = auth.claims.uid;
+
     match log_progress(user_id, &skill_name).await {
         Ok(_) => (StatusCode::OK, "Progress logged successfully").into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, format!("Failed to log progression: {e}")).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/students/skills/history",
+    responses(
+        (status = 200, description = "List of historical skills", body = Vec<String>),
+        (status = 400, description = "Failed to fetch historical skills")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+async fn get_historical_skills_endpoint(auth: AuthenticatedUser) -> impl IntoResponse {
+    let user_id = auth.claims.uid;
+
+    match get_historical_skills(user_id).await {
+        Ok(skills) => Json(skills).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            format!("Failed to fetch historical skills: {e}")
+        ).into_response(),
+    }
+}
+
+#[utoipa::path(
+    get,
+    path = "/students/skills/{skill_name}/history",
+    params(
+        ("skill_name" = String, Path, description = "Skill name to fetch history for")
+    ),
+    responses(
+        (status = 200, description = "Skill history", body = Vec<SkillProgression>),
+        (status = 400, description = "Failed to fetch history")
+    ),
+    security(
+        ("bearer_auth" = [])
+    )
+)]
+async fn get_skill_history_endpoint(
+    auth: AuthenticatedUser,
+    Path(skill_name): Path<String>
+) -> impl IntoResponse {
+    let user_id = auth.claims.uid;
+
+    match get_skill_history(user_id, &skill_name).await {
+        Ok(history) => Json(history).into_response(),
+        Err(e) => (
+            StatusCode::BAD_REQUEST,
+            format!("Failed to fetch skill history: {e}")
+        ).into_response(),
     }
 }
 
@@ -168,10 +264,12 @@ async fn register_account(Json(account): Json<Account>) -> impl IntoResponse {
 )]
 async fn get_progression(auth: AuthenticatedUser) -> impl IntoResponse {
     let user_id = auth.claims.uid;
+
     let progression = match get_all_progression_score(user_id).await {
         Ok(progression) => progression,
         Err(e) => return (StatusCode::BAD_REQUEST, format!("Failed to update skill: {e}")).into_response()
     };
+
     Json(progression).into_response()
 }
 
@@ -211,20 +309,24 @@ async fn validate_token(Json(token_data): Json<TokenValidation>) -> impl IntoRes
         Ok(bytes) => bytes,
         Err(_) => return (StatusCode::BAD_REQUEST, "Invalid token format").into_response()
     };
+
     let token_array: [u8; 32] = match token_bytes.try_into() {
         Ok(arr) => arr,
         Err(_) => return (StatusCode::BAD_REQUEST, "Invalid token length").into_response()
     };
+
     match check_token(token_array).await {
         Ok(user_id) => {
             let jwt_secret = match std::env::var("JWT_SECRET") {
                 Ok(secret) => secret,
                 Err(_) => return (StatusCode::SERVICE_UNAVAILABLE, "JWT Token not set").into_response()
             };
+
             let token = match issue_access_token(user_id.parse::<i32>().unwrap(), &jwt_secret) {
                 Ok(token) => token,
                 Err(_) => return (StatusCode::BAD_REQUEST, "Failed to issue token").into_response()
             };
+
             (StatusCode::OK, Json(serde_json::json!({
                 "valid": true,
                 "user_id": user_id,

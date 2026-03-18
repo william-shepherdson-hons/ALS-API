@@ -150,3 +150,85 @@ pub async fn log_progress(user_id: i32, skill_name: &str) -> Result<(), Knowledg
 
     Ok(())
 }
+
+pub async fn get_historical_skills(user_id: i32) -> Result<Vec<String>, KnowledgeError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+
+    let rows = client
+        .query(
+            "
+            SELECT DISTINCT s.skill_name
+            FROM historical_progression hp
+            INNER JOIN skills s ON s.skill_id = hp.skill_id
+            WHERE hp.user_id = $1
+            ",
+            &[&user_id],
+        )
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to fetch historical skills: {e}")))?;
+
+    let skills: Vec<String> = rows
+        .into_iter()
+        .map(|row| row.get(0))
+        .collect();
+
+    Ok(skills)
+}
+
+pub async fn get_skill_history(
+    user_id: i32,
+    skill_name: &str
+) -> Result<Vec<SkillProgression>, KnowledgeError> {
+    let connection_string = get_connection_string().await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
+
+    let (client, connection) = tokio_postgres::connect(&connection_string, NoTls)
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to connect to DB: {e}")))?;
+
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Postgres connection error: {e}");
+        }
+    });
+
+    let rows = client
+        .query(
+            "
+            SELECT s.skill_name, hp.progression
+            FROM historical_progression hp
+            INNER JOIN skills s ON s.skill_id = hp.skill_id
+            WHERE hp.user_id = $1 AND s.skill_name = $2
+            ORDER BY hp.recorded_at ASC
+            ",
+            &[&user_id, &skill_name],
+        )
+        .await
+        .map_err(|e| KnowledgeError::Database(format!("Failed to fetch skill history: {e}")))?;
+
+    let history: Vec<SkillProgression> = rows
+        .into_iter()
+        .map(|row| {
+            let skill_name: String = row.get(0);
+            let progression: f64 = row.get(1);
+
+            SkillProgression {
+                skill_name,
+                progression,
+            }
+        })
+        .collect();
+
+    Ok(history)
+}
