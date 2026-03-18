@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use tokio_postgres::NoTls;
 use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, skill_progression::{SkillProgression, SkillProgressionWithDate}}};
 
@@ -222,12 +223,12 @@ pub async fn get_skill_history(
         .map(|row| {
             let skill_name: String = row.get(0);
             let progression: f64 = row.get(1);
-            let recorded_at: String = row.get(2);
+            let recorded_at: DateTime<Utc> = row.get(2);
 
             SkillProgressionWithDate {
                 skill_name,
                 progression,
-                recorded_at,
+                recorded_at: recorded_at.to_rfc3339(),
             }
         })
         .collect();
