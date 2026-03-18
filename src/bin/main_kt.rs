@@ -137,9 +137,9 @@ async fn skill_update(
 
     let new_knowledge_score = calculate_mastery(
         existing_knowledge_score,
-        0.1,
-        0.1,
-        0.1,
+        0.05,
+        0.3,
+        0.4,
         body.correct
     ).await;
 
