@@ -1,5 +1,5 @@
 use tokio_postgres::NoTls;
-use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, skill_progression::SkillProgression}};
+use crate::{services::database::database::get_connection_string, structs::{knowledge_score_request::KnowledgeScoreRequest, knowledge_score_update::KnowledgeScoreUpdate, skill_progression::{SkillProgression, SkillProgressionWithDate}}};
 
 #[derive(thiserror::Error, Debug)]
 pub enum KnowledgeError {
@@ -189,7 +189,7 @@ pub async fn get_historical_skills(user_id: i32) -> Result<Vec<String>, Knowledg
 pub async fn get_skill_history(
     user_id: i32,
     skill_name: &str
-) -> Result<Vec<SkillProgression>, KnowledgeError> {
+) -> Result<Vec<SkillProgressionWithDate>, KnowledgeError> {
     let connection_string = get_connection_string().await
         .map_err(|e| KnowledgeError::Database(format!("Failed to build connection string: {e}")))?;
 
@@ -206,7 +206,7 @@ pub async fn get_skill_history(
     let rows = client
         .query(
             "
-            SELECT s.skill_name, hp.progression
+            SELECT s.skill_name, hp.progression, hp.recorded_at
             FROM historical_progression hp
             INNER JOIN skills s ON s.skill_id = hp.skill_id
             WHERE hp.user_id = $1 AND s.skill_name = $2
@@ -217,15 +217,17 @@ pub async fn get_skill_history(
         .await
         .map_err(|e| KnowledgeError::Database(format!("Failed to fetch skill history: {e}")))?;
 
-    let history: Vec<SkillProgression> = rows
+    let history: Vec<SkillProgressionWithDate> = rows
         .into_iter()
         .map(|row| {
             let skill_name: String = row.get(0);
             let progression: f64 = row.get(1);
+            let recorded_at: String = row.get(2);
 
-            SkillProgression {
+            SkillProgressionWithDate {
                 skill_name,
                 progression,
+                recorded_at,
             }
         })
         .collect();
